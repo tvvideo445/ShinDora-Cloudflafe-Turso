@@ -9,9 +9,4 @@ ShinDora Stream adalah platform video streaming proxy dan CDN manager untuk vide
 - **D1 Database ID**: `330e80a6-665d-4ae9-b204-f7ce1c91a6e8`
 - **D1 Binding**: `DB`
 - **Database Dump**: `d1-dump.sql` (Berisi 271 video links & 4 pengaturan sistem)
-
-## Files Summary
-- `wrangler.toml`: Konfigurasi Wrangler siap deploy ke CI/CLI.
-- `cloudflare-worker-d1.js`: 100% Standalone worker dengan D1 SQL.
-- `d1-dump.sql`: Data dump lengkap 271 video siap import ke D1.
-- `CLOUDFLARE_D1_GUIDE.md`: Panduan eksekusi import dan deploy.
+- **Embedded UI**: Cloudflare Worker kini menyertakan tampilan HTML/CSS Dashboard lengkap di route `/` dan pemutar video JWPlayer di `/v/:slug`.
