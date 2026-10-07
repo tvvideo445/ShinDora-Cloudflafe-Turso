@@ -1,0 +1,27 @@
+{
+  "summary": "Verified the live Mongo-backed API contains 273 videos and login works with httpOnly session/refresh cookies. React dashboard rendered 273 table rows and search/filter/navigation worked; stats briefly rendered stale zero values in the UI despite the API returning 273/105/167/0. Worker scripts are present and no D1 worker file exists, but stale regression coverage still references the removed cloudflare-worker-d1.js."
+  ,"backend_issues": {
+    "critical": [
+      {"endpoint": "/api/stats, /api/links, /api/settings", "issue": "Dashboard data endpoints return 200 without authentication, exposing all video metadata and settings publicly.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Dashboard stats loading", "issue": "During the tested login-to-dashboard flow, total/VK stats displayed 0 while the same live API returned totalVideos=273 and vkCount=105; table loaded 273 rows and OK showed 167. This suggests a race, failed/late stats response, or stale state and needs retest with network timing.", "affected_selectors": ["[data-testid=stats-total-videos]", "[data-testid=stats-vk-videos]", "[data-testid=stats-ok-videos]"]},
+      {"flow": "Cloudflare Worker regression test", "issue": "Existing test_cloudflare_worker_d1_review.py opens removed /app/cloudflare-worker-d1.js and fails with FileNotFoundError; it must be updated to the three current worker files.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_shindora_review.py", "/app/backend/tests/test_cloudflare_worker_d1_review.py", "/app/test_reports/pytest/iteration_4_results.xml"],
+  "action_items": ["Protect dashboard data endpoints with the session authentication dependency (or explicitly confirm public exposure is intended).", "Investigate dashboard stats request/state race and retest after waiting for all responses.", "Replace stale D1 regression test references with cloudflare-worker.js, cloudflare-worker-download.js, and cloudflare-worker-all-in-one.js."],
+  "critical_code_review_comments": ["server.py uses wildcard CORS with allow_credentials=True; use explicit configured origins when cookie authentication is required.", "Authentication and admin passwords are stored and compared as plaintext; this does not meet the requested bcrypt/auth hardening expectations."],
+  "updated_files": ["/app/test_reports/iteration_4.json", "/app/test_reports/pytest/iteration_4_results.xml"],
+  "success_rate": {"backend": "50% (3 passed, 3 failed)", "frontend": "80%"},
+  "seed_data_creation": "None; no records were created or modified.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Live host cloudflare-stream-1.preview.emergentagent.com; API stats returned 273 total, 105 VK, 167 OK, 0 Sibnet. Login admin/admin123 passed with both cookies. Dashboard/search/filter/settings/VAST navigation passed; direct output generator/new-link flow was not exercised.",
+  "rca of the issue": "The public API routes in server.py have no auth dependency, so unauthenticated requests reach Mongo queries directly. The UI stats discrepancy was observed immediately after navigation while links had already rendered; likely asynchronous stats response/state timing, but it requires a controlled retest."
+}
