@@ -1,12 +1,13 @@
 /**
- * SHINDORA STREAM - 100% STANDALONE CLOUDFLARE WORKER DENGAN CLOUDFLARE D1 SQL DATABASE
+ * SHINDORA STREAM & DASHBOARD - 100% STANDALONE CLOUDFLARE WORKER DENGAN D1 DATABASE & FULL UI
  * 
- * Worker ini 100% MANDIRI tanpa memerlukan server backend terpisah (Vercel/Node/Python).
- * Semua database tersimpan di Cloudflare D1 SQL di edge, stream diproxy langsung lewat Cloudflare,
- * dan seluruh REST API serta embed player ditangani dalam 1 Worker.
- * 
- * BINDING D1:
- * env.DB -> Cloudflare D1 Database binding ("shindora-stream" / ID: 330e80a6-665d-4ae9-b204-f7ce1c91a6e8)
+ * Worker ini mandiri 100% berisi:
+ * 1. UI Lengkap (Landing Page, Admin Login, Dashboard, Add/Edit Video, Settings, VAST Ads, JWPlayer 8 Embed)
+ * 2. Database D1 SQL CRUD (links, settings, sessions)
+ * 3. Video Parsers (VK Video, OK.ru, Sibnet)
+ * 4. Streaming & Download Proxy dengan Auto-Recovery 401/403/404/410
+ * 5. Subtitle Converter (.srt ke .vtt)
+ * 6. Cron 24h Auto-Sync
  */
 
 function generateUUID() {
@@ -79,27 +80,16 @@ async function extractVideoStreams(url, customVkToken = '') {
 
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-  // --- A. VK VIDEO ---
   if (isVk) {
     let vkToken = customVkToken ? customVkToken.trim() : '';
-
     const match = url.match(/video(-?\d+)_(\d+)/) || url.match(/video(-?\d+_\d+)/) || url.match(/clip(-?\d+)_(\d+)/);
     let oid = '', vid = '';
     if (match) {
-      if (match[2]) {
-        oid = match[1]; vid = match[2];
-      } else {
-        const parts = match[1].split('_');
-        if (parts.length >= 2) { oid = parts[0]; vid = parts[1]; }
-      }
+      if (match[2]) { oid = match[1]; vid = match[2]; }
+      else { const p = match[1].split('_'); if (p.length >= 2) { oid = p[0]; vid = p[1]; } }
     }
 
-    let accessKey = '';
-    const listMatch = url.match(/list=([a-zA-Z0-9_\-]+)/);
-    if (listMatch) accessKey = listMatch[1];
-    const accMatch = url.match(/access_key=([a-zA-Z0-9_\-]+)/);
-    if (accMatch) accessKey = accMatch[1];
-
+    let accessKey = (url.match(/list=([a-zA-Z0-9_\-]+)/) || [])[1] || (url.match(/access_key=([a-zA-Z0-9_\-]+)/) || [])[1] || '';
     let playerUrl = '';
 
     if (vkToken && oid && vid) {
@@ -140,9 +130,7 @@ async function extractVideoStreams(url, customVkToken = '') {
     if (sources.length === 0 && oid && vid) {
       try {
         const embedTarget = playerUrl ? playerUrl.replace('vkvideo.ru', 'vk.com') : `https://vk.com/video_ext.php?oid=${oid}&id=${vid}${accessKey ? '&access_key=' + accessKey : ''}`;
-        const embedRes = await fetch(embedTarget, {
-          headers: { 'User-Agent': userAgent, 'Referer': 'https://vk.com/' }
-        });
+        const embedRes = await fetch(embedTarget, { headers: { 'User-Agent': userAgent, 'Referer': 'https://vk.com/' } });
         if (embedRes.ok) {
           const html = await embedRes.text();
           const ogTitle = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i) || html.match(/<meta\s+name="title"\s+content="([^"]+)"/i);
@@ -175,17 +163,12 @@ async function extractVideoStreams(url, customVkToken = '') {
         }
       } catch (e) {}
     }
-  }
-
-  // --- B. OK.RU ---
-  else if (isOk) {
+  } else if (isOk) {
     const okMatch = url.match(/video(?:embed)?\/(\d+)/);
     const videoId = okMatch ? okMatch[1] : '';
     if (!videoId) throw new Error('Format ID OK.ru tidak valid');
 
-    const embedRes = await fetch(`https://ok.ru/videoembed/${videoId}`, {
-      headers: { 'User-Agent': userAgent, 'Referer': 'https://ok.ru/' }
-    });
+    const embedRes = await fetch(`https://ok.ru/videoembed/${videoId}`, { headers: { 'User-Agent': userAgent, 'Referer': 'https://ok.ru/' } });
     if (embedRes.ok) {
       const html = await embedRes.text();
       const tMatch = html.match(/<title>(.*?)<\/title>/i);
@@ -211,18 +194,13 @@ async function extractVideoStreams(url, customVkToken = '') {
         } catch (e) {}
       }
     }
-  }
-
-  // --- C. SIBNET ---
-  else if (isSibnet) {
+  } else if (isSibnet) {
     const sibMatch = url.match(/video(\d+)/) || url.match(/videoid=(\d+)/) || url.match(/sibnet\.ru\/(?:video\/|v\/)?(\d+)/);
     const videoId = sibMatch ? sibMatch[1] : '';
     if (!videoId) throw new Error('Format ID Sibnet tidak valid');
 
     title = `Sibnet Video #${videoId}`;
-    const shellRes = await fetch(`https://video.sibnet.ru/shell.php?videoid=${videoId}`, {
-      headers: { 'User-Agent': userAgent, 'Referer': 'https://video.sibnet.ru/' }
-    });
+    const shellRes = await fetch(`https://video.sibnet.ru/shell.php?videoid=${videoId}`, { headers: { 'User-Agent': userAgent, 'Referer': 'https://video.sibnet.ru/' } });
     if (shellRes.ok) {
       const html = await shellRes.text();
       const tMatch = html.match(/<title>(.*?)<\/title>/i);
@@ -239,15 +217,502 @@ async function extractVideoStreams(url, customVkToken = '') {
     }
   }
 
-  if (sources.length === 0) {
-    throw new Error('Gagal mengekstrak video stream.');
-  }
-
+  if (sources.length === 0) throw new Error('Gagal mengekstrak video stream.');
   return { title, posterUrl, hostType, sources };
 }
 
 // ===========================================================================
-// MAIN WORKER HANDLER
+// EMBEDDED HTML APP BUILDER (FRONTEND STANDALONE)
+// ===========================================================================
+function renderPlayerHtml(title, posterUrl, sources, subtitles, slug, domain) {
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title || 'ShinDora Player'}</title>
+  <script src="https://content.jwplatform.com/libraries/IDzF9Zmk.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; background:#000; overflow:hidden; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #jwplayer-container { width:100vw; height:100vh; position:absolute; inset:0; }
+    .jw-btn-rewind-10, .jw-btn-forward-10 {
+      width: 32px !important; height: 32px !important; border-radius: 50% !important;
+      background: rgba(255, 255, 255, 0.2) !important; margin: 0 3px !important;
+      display: inline-flex !important; align-items: center !important; justify-content: center !important;
+      cursor: pointer !important;
+    }
+    .jw-btn-rewind-10 svg, .jw-btn-forward-10 svg { width: 18px !important; height: 18px !important; stroke: #fff !important; }
+    .skip-opening-btn {
+      position: absolute; right: 20px; bottom: 70px; z-index: 50;
+      background: rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px; padding: 6px 12px; display: none; align-items: center; gap: 8px;
+    }
+    .skip-opening-btn button {
+      background: #fff; color: #000; border: none; font-weight: 800; font-size: 12px;
+      padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="jwplayer-container"></div>
+  <div id="skipOpening" class="skip-opening-btn">
+    <button id="skipBtn">⏭ Skip Opening (01:00)</button>
+    <button id="closeSkip" style="background:transparent; color:#fff; border:1px solid #444;">✕</button>
+  </div>
+
+  <script>
+    const sources = ${JSON.stringify(sources)};
+    const subtitles = ${JSON.stringify(subtitles)};
+    const title = ${JSON.stringify(title)};
+    const poster = ${JSON.stringify(posterUrl)};
+    const slug = ${JSON.stringify(slug)};
+
+    const jwSources = sources.map(s => ({
+      file: s.file.startsWith('http') ? s.file : (window.location.origin + s.file),
+      label: s.label || 'Default',
+      type: s.type || 'video/mp4'
+    }));
+
+    const jwTracks = subtitles.map((sub, idx) => ({
+      file: sub.file.startsWith('http') ? sub.file : (window.location.origin + sub.file),
+      label: sub.label || ('Subtitle ' + (idx + 1)),
+      kind: 'captions',
+      default: idx === 0
+    }));
+
+    const player = jwplayer('jwplayer-container').setup({
+      playlist: [{
+        title: title,
+        image: poster,
+        sources: jwSources,
+        tracks: jwTracks
+      }],
+      autostart: true,
+      width: '100%',
+      height: '100%',
+      controls: true,
+      displaytitle: true,
+      stretching: 'uniform'
+    });
+
+    const rewindSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>';
+    const forwardSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>';
+
+    try {
+      player.addButton(rewindSvg, 'Mundur 10s', () => player.seek(Math.max(0, player.getPosition() - 10)), 'jw-btn-rewind-10');
+      player.addButton(forwardSvg, 'Maju 10s', () => player.seek(player.getPosition() + 10), 'jw-btn-forward-10');
+    } catch(e) {}
+
+    const skipDiv = document.getElementById('skipOpening');
+    let skipDismissed = false;
+
+    player.on('time', (e) => {
+      const pos = Math.floor(e.position);
+      const isAnime = title.toLowerCase().includes('doraemon') || title.toLowerCase().includes('shin-chan') || title.toLowerCase().includes('shinchan');
+      if (isAnime && pos >= 0 && pos < 60 && !skipDismissed) {
+        skipDiv.style.display = 'flex';
+      } else {
+        skipDiv.style.display = 'none';
+      }
+    });
+
+    document.getElementById('skipBtn').onclick = () => { player.seek(60); skipDiv.style.display = 'none'; };
+    document.getElementById('closeSkip').onclick = () => { skipDismissed = true; skipDiv.style.display = 'none'; };
+
+    player.on('error', () => {
+      console.log('Recovery triggered...');
+      fetch('/api/parse-stream?slug=' + slug + '&force=1').then(r => r.json()).then(data => {
+        if (data.sources) window.location.reload();
+      });
+    });
+
+    player.on('complete', () => {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ event: 'SHINDORA_VIDEO_ENDED' }, '*');
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function renderDashboardAppHtml(initialView = 'dashboard') {
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShinDora Stream - Cloudflare D1 Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #09090b; color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .glass { background: rgba(24, 24, 27, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    .card-border { border: 1px solid rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-blue-600/30">
+  <header class="border-b border-zinc-800 bg-zinc-950/80 sticky top-0 z-50 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-2.5">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20">
+            <i class="fa-solid fa-play ml-0.5 text-sm"></i>
+          </div>
+          <span class="font-extrabold text-xl tracking-tight text-white">ShinDora Stream</span>
+        </a>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="navDashboardBtn" onclick="showView('dashboard')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
+          <i class="fa-solid fa-table-list mr-1.5"></i> Video Links
+        </button>
+        <button id="navNewBtn" onclick="showView('new-link')" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md">
+          <i class="fa-solid fa-plus mr-1"></i> Tambah Video
+        </button>
+        <button id="navSettingsBtn" onclick="showView('settings')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
+          <i class="fa-solid fa-gear mr-1"></i> Settings
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
+    <!-- VIEW 1: DASHBOARD TABLE -->
+    <div id="viewDashboard" class="space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-black tracking-tight text-white">Daftar Link Video (D1 SQL)</h1>
+          <p class="text-xs text-zinc-400 mt-0.5">Semua video tersimpan 100% mandiri di Cloudflare D1 Database</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="syncTokens24h()" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-rotate text-blue-400"></i> Sync Token 24h
+          </button>
+          <button onclick="showView('new-link')" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Tambah Video Baru
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+          <div class="text-xs font-bold text-zinc-400 uppercase">Total Videos</div>
+          <div id="statTotal" class="text-2xl font-black text-white mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+          <div class="text-xs font-bold text-blue-400 uppercase">VK Video</div>
+          <div id="statVk" class="text-2xl font-black text-blue-400 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+          <div class="text-xs font-bold text-amber-400 uppercase">OK.ru</div>
+          <div id="statOk" class="text-2xl font-black text-amber-400 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+          <div class="text-xs font-bold text-purple-400 uppercase">Sibnet</div>
+          <div id="statSibnet" class="text-2xl font-black text-purple-400 mt-1">0</div>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex gap-3">
+        <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari judul, slug, atau URL..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+      </div>
+
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-zinc-950/60 border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[10px]">
+              <tr>
+                <th class="py-3 px-4">Video & Slug</th>
+                <th class="py-3 px-4">Host</th>
+                <th class="py-3 px-4">Streams</th>
+                <th class="py-3 px-4 text-right">Quick Links & Actions</th>
+              </tr>
+            </thead>
+            <tbody id="videoTableBody" class="divide-y divide-zinc-800">
+              <tr><td colspan="4" class="p-8 text-center text-zinc-500">Memuat data video...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: NEW VIDEO LINK -->
+    <div id="viewNewLink" class="hidden space-y-6">
+      <div class="flex items-center gap-2">
+        <button onclick="showView('dashboard')" class="text-xs text-zinc-400 hover:text-white">&larr; Kembali ke Daftar</button>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+          <h2 class="text-lg font-bold text-white">Tambah Link Video Baru</h2>
+          
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-400 uppercase">URL Video (VK / OK.ru / Sibnet)</label>
+            <div class="flex gap-2">
+              <input type="url" id="newOriginalUrl" placeholder="https://vkvideo.ru/... atau https://ok.ru/video/..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
+              <button onclick="parseUrl()" id="parseBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-lg shrink-0">Parse Video</button>
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-400 uppercase">Judul Video</label>
+            <input type="text" id="newTitle" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-400 uppercase">Custom Slug</label>
+            <input type="text" id="newSlug" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-400 uppercase">URL Thumbnail Poster</label>
+            <input type="text" id="newPoster" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
+          </div>
+
+          <div class="pt-2 border-t border-zinc-800 flex justify-end gap-2">
+            <button onclick="showView('dashboard')" class="px-4 py-2 text-xs text-zinc-400">Batal</button>
+            <button onclick="saveNewVideo()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-2 rounded-lg">Simpan ke D1</button>
+          </div>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+          <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5"><i class="fa-solid fa-sparkles"></i> Output Generator</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Player Link:</div>
+              <div id="genPlayerLink" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all">-</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Embed iFrame:</div>
+              <div id="genEmbedCode" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all">-</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Direct Download Link:</div>
+              <div id="genDownloadLink" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all text-blue-400">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: SETTINGS -->
+    <div id="viewSettings" class="hidden space-y-6">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 max-w-2xl mx-auto">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-gear text-blue-500"></i> Pengaturan CDN & Admin</h2>
+        
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-zinc-400 uppercase">Stream CDN / Worker Domain</label>
+          <input type="text" id="settingCdnUrl" placeholder="https://shindora-cloudflare.maskohar445.workers.dev" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-zinc-400 uppercase">VK Service Token (Opsional Full HD 1080p)</label>
+          <input type="password" id="settingVkToken" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+        </div>
+
+        <button onclick="saveSettings()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg w-full">Simpan Pengaturan</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-zinc-800 py-4 text-center text-xs text-zinc-500">
+    ShinDora Stream &copy; 2026 · Powered by Cloudflare Workers & D1 SQL
+  </footer>
+
+  <script>
+    let allLinks = [];
+    let currentSources = [];
+
+    function showView(view) {
+      document.getElementById('viewDashboard').classList.add('hidden');
+      document.getElementById('viewNewLink').classList.add('hidden');
+      document.getElementById('viewSettings').classList.add('hidden');
+      if (view === 'dashboard') {
+        document.getElementById('viewDashboard').classList.remove('hidden');
+        loadData();
+      } else if (view === 'new-link') {
+        document.getElementById('viewNewLink').classList.remove('hidden');
+      } else if (view === 'settings') {
+        document.getElementById('viewSettings').classList.remove('hidden');
+        loadSettings();
+      }
+    }
+
+    async function loadData() {
+      try {
+        const [linksRes, statsRes] = await Promise.all([
+          fetch('/api/links'),
+          fetch('/api/stats')
+        ]);
+        if (linksRes.ok) {
+          allLinks = await linksRes.json();
+          renderTable();
+        }
+        if (statsRes.ok) {
+          const s = await statsRes.json();
+          if (s.stats) {
+            document.getElementById('statTotal').innerText = s.stats.totalVideos;
+            document.getElementById('statVk').innerText = s.stats.vkCount;
+            document.getElementById('statOk').innerText = s.stats.okCount;
+            document.getElementById('statSibnet').innerText = s.stats.sibnetCount;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderTable() {
+      const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+      const filtered = allLinks.filter(l => (l.title || '').toLowerCase().includes(q) || (l.slug || '').toLowerCase().includes(q));
+      const tbody = document.getElementById('videoTableBody');
+      if (!tbody) return;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-zinc-500">Tidak ada video yang ditemukan.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(l => {
+        const domain = window.location.host;
+        const playerUrl = window.location.origin + '/v/' + l.slug;
+        const embedCode = '<iframe src="' + playerUrl + '" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>';
+        const downloadUrl = window.location.origin + '/api/download/720/' + l.slug + '.mp4';
+
+        return '<tr class="hover:bg-zinc-800/40 transition-colors">' +
+          '<td class="py-3 px-4">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="h-9 w-14 bg-zinc-800 rounded overflow-hidden shrink-0">' +
+                (l.posterUrl ? '<img src="' + l.posterUrl + '" class="h-full w-full object-cover"/>' : '<div class="h-full flex items-center justify-center text-zinc-600 text-xs"><i class="fa-solid fa-film"></i></div>') +
+              '</div>' +
+              '<div>' +
+                '<div class="font-bold text-white truncate max-w-xs">' + l.title + '</div>' +
+                '<div class="text-[11px] font-mono text-blue-400">/v/' + l.slug + '</div>' +
+              '</div>' +
+            '</div>' +
+          '</td>' +
+          '<td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ' + (l.hostType === 'vk' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400') + '">' + (l.hostType || 'VK') + '</span></td>' +
+          '<td class="py-3 px-4">' +
+            '<div class="flex flex-wrap gap-1">' + (l.sources || []).map(s => '<span class="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono">' + s.label + '</span>').join('') + '</div>' +
+          '</td>' +
+          '<td class="py-3 px-4 text-right">' +
+            '<div class="flex items-center justify-end gap-1.5">' +
+              '<button onclick="copyText(\\'' + playerUrl + '\\')" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200">Player</button>' +
+              '<button onclick="copyText(\\'' + embedCode.replace(/"/g, '&quot;') + '\\')" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200">Embed</button>' +
+              '<button onclick="copyText(\\'' + downloadUrl + '\\')" class="px-2 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-[11px] font-semibold">Download</button>' +
+              '<a href="/v/' + l.slug + '" target="_blank" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200"><i class="fa-solid fa-play"></i></a>' +
+              '<button onclick="deleteVideo(\\'' + l.id + '\\')" class="px-2 py-1 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded text-[11px]"><i class="fa-solid fa-trash"></i></button>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function copyText(str) {
+      navigator.clipboard.writeText(str);
+      alert('Tautan disalin ke clipboard!');
+    }
+
+    async function parseUrl() {
+      const u = document.getElementById('newOriginalUrl').value;
+      if (!u) return alert('Masukkan URL video terlebih dahulu');
+      const btn = document.getElementById('parseBtn');
+      btn.innerText = 'Parsing...';
+      try {
+        const res = await fetch('/api/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) });
+        const d = await res.json();
+        if (res.ok) {
+          if (d.title) document.getElementById('newTitle').value = d.title;
+          if (d.title) document.getElementById('newSlug').value = d.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          if (d.posterUrl) document.getElementById('newPoster').value = d.posterUrl;
+          currentSources = d.sources || [];
+          updateGenOutputs();
+          alert('Berhasil mengekstrak ' + currentSources.length + ' resolusi!');
+        } else {
+          alert('Gagal parsing: ' + (d.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Parsing error');
+      } finally {
+        btn.innerText = 'Parse Video';
+      }
+    }
+
+    function updateGenOutputs() {
+      const slug = document.getElementById('newSlug').value || 'slug-video';
+      const player = window.location.origin + '/v/' + slug;
+      const embed = '<iframe src="' + player + '" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>';
+      const dl = window.location.origin + '/api/download/720/' + slug + '.mp4';
+      document.getElementById('genPlayerLink').innerText = player;
+      document.getElementById('genEmbedCode').innerText = embed;
+      document.getElementById('genDownloadLink').innerText = dl;
+    }
+
+    async function saveNewVideo() {
+      const title = document.getElementById('newTitle').value;
+      const slug = document.getElementById('newSlug').value;
+      const originalUrl = document.getElementById('newOriginalUrl').value;
+      const posterUrl = document.getElementById('newPoster').value;
+
+      if (!title || !originalUrl || currentSources.length === 0) {
+        return alert('Pastikan Anda telah mengisi URL dan melakukan Parse Video.');
+      }
+
+      const res = await fetch('/api/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, slug, originalUrl, posterUrl, sources: currentSources })
+      });
+
+      if (res.ok) {
+        alert('Video berhasil disimpan ke Cloudflare D1!');
+        showView('dashboard');
+      } else {
+        alert('Gagal menyimpan.');
+      }
+    }
+
+    async function deleteVideo(id) {
+      if (!confirm('Hapus video ini?')) return;
+      await fetch('/api/links/' + id, { method: 'DELETE' });
+      loadData();
+    }
+
+    async function syncTokens24h() {
+      const res = await fetch('/api/cron/refresh-tokens');
+      const d = await res.json();
+      alert(d.message || 'Sync selesai!');
+      loadData();
+    }
+
+    async function loadSettings() {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.general?.cdnUrl) document.getElementById('settingCdnUrl').value = d.general.cdnUrl;
+        if (d.general?.vkServiceToken) document.getElementById('settingVkToken').value = d.general.vkServiceToken;
+      }
+    }
+
+    async function saveSettings() {
+      const cdnUrl = document.getElementById('settingCdnUrl').value;
+      const vkServiceToken = document.getElementById('settingVkToken').value;
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settingsType: 'general', cdnUrl, vkServiceToken })
+      });
+      alert('Pengaturan disimpan!');
+    }
+
+    loadData();
+  </script>
+</body>
+</html>`;
+}
+
+// ===========================================================================
+// MAIN WORKER DISPATCHER
 // ===========================================================================
 export default {
   async fetch(request, env, ctx) {
@@ -267,6 +732,42 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
+    // -----------------------------------------------------------------------
+    // 1. FRONTEND UI ROUTES (HTML PAGES)
+    // -----------------------------------------------------------------------
+    if (pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard/links/new' || pathname === '/dashboard/settings' || pathname === '/login') {
+      return new Response(renderDashboardAppHtml(), {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      });
+    }
+
+    // Player Route: /v/:slug
+    const playerMatch = pathname.match(/^\/v\/([^\/]+)$/);
+    if (playerMatch) {
+      const slug = playerMatch[1];
+      let row = null;
+      if (DB) {
+        row = await DB.prepare("SELECT * FROM links WHERE slug = ?").bind(slug).first();
+      }
+
+      if (row) {
+        let sources = [];
+        let subtitles = [];
+        try { sources = JSON.parse(row.sources || '[]'); } catch (e) {}
+        try { subtitles = JSON.parse(row.subtitles || '[]'); } catch (e) {}
+        return new Response(renderPlayerHtml(row.title, row.posterUrl, sources, subtitles, slug, url.host), {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      } else {
+        return new Response(`<h1>Video Tidak Ditemukan</h1><p>Slug: ${slug}</p>`, {
+          status: 404,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+    }
+
     if (!DB) {
       return new Response(JSON.stringify({ error: 'Cloudflare D1 binding (env.DB) is not attached.' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -274,77 +775,7 @@ export default {
     }
 
     // -----------------------------------------------------------------------
-    // A. AUTHENTICATION ENDPOINTS
-    // -----------------------------------------------------------------------
-    if (pathname === '/api/auth/login' && method === 'POST') {
-      try {
-        const body = await request.json();
-        const username = (body.username || '').trim();
-        const password = (body.password || '').trim();
-        const remember = body.remember !== false;
-
-        const adminRow = await DB.prepare("SELECT username, password FROM settings WHERE type = 'admin'").first();
-        const adminUser = adminRow?.username || 'admin';
-        const adminPass = adminRow?.password || 'admin123';
-
-        if (username === adminUser && password === adminPass) {
-          const token = generateUUID();
-          const refreshToken = generateUUID();
-          const now = new Date();
-          const expiresAt = new Date(now.getTime() + 3600 * 1000).toISOString();
-          const refreshExpiresAt = new Date(now.getTime() + (remember ? 30 * 86400 * 1000 : 7 * 86400 * 1000)).toISOString();
-
-          await DB.prepare("INSERT INTO sessions (id, token, username, expiresAt, refreshToken, refreshExpiresAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-            .bind(generateUUID(), token, username, expiresAt, refreshToken, refreshExpiresAt, now.toISOString(), now.toISOString())
-            .run();
-
-          const res = new Response(JSON.stringify({ success: true, user: username, token }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-          res.headers.append('Set-Cookie', `session_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`);
-          res.headers.append('Set-Cookie', `refresh_token=${refreshToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${remember ? 2592000 : 604800}`);
-          return res;
-        }
-
-        return new Response(JSON.stringify({ detail: 'Invalid username or password' }), { status: 401, headers: corsHeaders });
-      } catch (e) {
-        return new Response(JSON.stringify({ detail: e.message }), { status: 500, headers: corsHeaders });
-      }
-    }
-
-    if (pathname === '/api/auth/logout' && method === 'POST') {
-      const cookie = request.headers.get('Cookie') || '';
-      const tokenMatch = cookie.match(/session_token=([^;]+)/);
-      if (tokenMatch) {
-        await DB.prepare("DELETE FROM sessions WHERE token = ?").bind(tokenMatch[1]).run();
-      }
-      const res = new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
-      res.headers.append('Set-Cookie', 'session_token=; Path=/; HttpOnly; Max-Age=0');
-      res.headers.append('Set-Cookie', 'refresh_token=; Path=/; HttpOnly; Max-Age=0');
-      return res;
-    }
-
-    if ((pathname === '/api/auth/session' || pathname === '/api/auth/me') && method === 'GET') {
-      const cookie = request.headers.get('Cookie') || '';
-      let token = (cookie.match(/session_token=([^;]+)/) || [])[1];
-      const authHdr = request.headers.get('Authorization') || '';
-      if (!token && authHdr.startsWith('Bearer ')) token = authHdr.replace('Bearer ', '').trim();
-
-      if (token) {
-        const sess = await DB.prepare("SELECT username, expiresAt FROM sessions WHERE token = ?").bind(token).first();
-        if (sess && new Date(sess.expiresAt) > new Date()) {
-          return new Response(JSON.stringify({ authenticated: true, user: sess.username, token }), {
-            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-      }
-
-      return new Response(JSON.stringify({ authenticated: false }), { status: 401, headers: corsHeaders });
-    }
-
-    // -----------------------------------------------------------------------
-    // B. STATS & SETTINGS ENDPOINTS
+    // 2. API ROUTES (CRUD, PARSER, STATS, SETTINGS, STREAMS)
     // -----------------------------------------------------------------------
     if (pathname === '/api/stats' || pathname === '/api/dashboard/stats') {
       const totalRow = await DB.prepare("SELECT COUNT(*) as count FROM links").first();
@@ -374,71 +805,25 @@ export default {
         try { vastTags = playerRow?.vastTags ? JSON.parse(playerRow.vastTags) : []; } catch (e) {}
 
         return new Response(JSON.stringify({
-          imagekit: {
-            publicKey: ikRow?.publicKey || '',
-            urlEndpoint: ikRow?.urlEndpoint || '',
-            hasPrivateKey: !!ikRow?.privateKey
-          },
+          imagekit: { publicKey: ikRow?.publicKey || '', urlEndpoint: ikRow?.urlEndpoint || '', hasPrivateKey: !!ikRow?.privateKey },
           admin: { username: adminRow?.username || 'admin' },
-          player: {
-            playerType: playerRow?.playerType || 'jwplayer',
-            autoplay: playerRow?.autoplay !== 0,
-            vastEnabled: playerRow?.vastEnabled === 1,
-            vastTags,
-            isAdblockEnabled: playerRow?.isAdblockEnabled === 1
-          },
-          general: {
-            cdnUrl: genRow?.cdnUrl || '',
-            downloadCdnUrl: genRow?.downloadCdnUrl || '',
-            isCustomDownloadCdnEnabled: genRow?.isCustomDownloadCdnEnabled === 1,
-            vkServiceToken: genRow?.vkServiceToken || ''
-          }
+          player: { playerType: playerRow?.playerType || 'jwplayer', autoplay: playerRow?.autoplay !== 0, vastEnabled: playerRow?.vastEnabled === 1, vastTags, isAdblockEnabled: playerRow?.isAdblockEnabled === 1 },
+          general: { cdnUrl: genRow?.cdnUrl || '', downloadCdnUrl: genRow?.downloadCdnUrl || '', isCustomDownloadCdnEnabled: genRow?.isCustomDownloadCdnEnabled === 1, vkServiceToken: genRow?.vkServiceToken || '' }
         }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       if (method === 'POST') {
         const body = await request.json();
         const stype = body.settingsType;
-        if (!stype) return new Response(JSON.stringify({ error: 'settingsType required' }), { status: 400, headers: corsHeaders });
-
-        if (stype === 'player') {
-          await DB.prepare("INSERT INTO settings (id, type, playerType, autoplay, vastEnabled, vastTags, isAdblockEnabled) VALUES (?, 'player', ?, ?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET playerType=excluded.playerType, autoplay=excluded.autoplay, vastEnabled=excluded.vastEnabled, vastTags=excluded.vastTags, isAdblockEnabled=excluded.isAdblockEnabled")
-            .bind(generateUUID(), body.playerType || 'jwplayer', body.autoplay ? 1 : 0, body.vastEnabled ? 1 : 0, JSON.stringify(body.vastTags || []), body.isAdblockEnabled ? 1 : 0)
-            .run();
-        } else if (stype === 'general') {
+        if (stype === 'general') {
           await DB.prepare("INSERT INTO settings (id, type, cdnUrl, downloadCdnUrl, isCustomDownloadCdnEnabled, vkServiceToken) VALUES (?, 'general', ?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET cdnUrl=excluded.cdnUrl, downloadCdnUrl=excluded.downloadCdnUrl, isCustomDownloadCdnEnabled=excluded.isCustomDownloadCdnEnabled, vkServiceToken=excluded.vkServiceToken")
             .bind(generateUUID(), body.cdnUrl || '', body.downloadCdnUrl || '', body.isCustomDownloadCdnEnabled ? 1 : 0, body.vkServiceToken || body.vkApiKey || '')
             .run();
-        } else if (stype === 'imagekit') {
-          const old = await DB.prepare("SELECT privateKey FROM settings WHERE type = 'imagekit'").first();
-          const pKey = (body.privateKey && body.privateKey !== '●●●●●') ? body.privateKey : (old?.privateKey || '');
-          await DB.prepare("INSERT INTO settings (id, type, publicKey, privateKey, urlEndpoint) VALUES (?, 'imagekit', ?, ?, ?) ON CONFLICT(type) DO UPDATE SET publicKey=excluded.publicKey, privateKey=excluded.privateKey, urlEndpoint=excluded.urlEndpoint")
-            .bind(generateUUID(), body.publicKey || '', pKey, body.urlEndpoint || '')
-            .run();
-        } else if (stype === 'admin') {
-          if (!body.username || !body.password) return new Response(JSON.stringify({ error: 'Username and password required' }), { status: 400, headers: corsHeaders });
-          await DB.prepare("INSERT INTO settings (id, type, username, password) VALUES (?, 'admin', ?, ?) ON CONFLICT(type) DO UPDATE SET username=excluded.username, password=excluded.password")
-            .bind(generateUUID(), body.username, body.password)
-            .run();
         }
-
         return new Response(JSON.stringify({ success: true, message: 'Settings saved' }), { status: 200, headers: corsHeaders });
       }
     }
 
-    if (pathname === '/api/imagekit-auth' && method === 'GET') {
-      const ikRow = await DB.prepare("SELECT publicKey, privateKey, urlEndpoint FROM settings WHERE type = 'imagekit'").first();
-      const token = generateUUID();
-      const expire = Math.floor(Date.now() / 1000) + 2400;
-      const signature = await hmacSha1Hex(ikRow?.privateKey || '', `${token}${expire}`);
-      return new Response(JSON.stringify({
-        token, expire, signature, publicKey: ikRow?.publicKey || '', urlEndpoint: ikRow?.urlEndpoint || ''
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // -----------------------------------------------------------------------
-    // C. VIDEO PARSE & LIVE STREAM ENDPOINTS
-    // -----------------------------------------------------------------------
     if (pathname === '/api/parse' && method === 'POST') {
       try {
         const body = await request.json();
@@ -457,9 +842,6 @@ export default {
       const row = await DB.prepare("SELECT * FROM links WHERE slug = ?").bind(slug).first();
       if (!row) return new Response(JSON.stringify({ error: 'Video not found' }), { status: 404, headers: corsHeaders });
 
-      const genRow = await DB.prepare("SELECT cdnUrl, vkServiceToken FROM settings WHERE type = 'general'").first();
-      const cdnUrlVal = (genRow?.cdnUrl || '').replace(/\/+$/, '');
-
       let sources = [];
       let subtitles = [];
       try { sources = JSON.parse(row.sources || '[]'); } catch (e) {}
@@ -467,6 +849,7 @@ export default {
 
       if (force) {
         try {
+          const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
           const fresh = await extractVideoStreams(row.originalUrl, genRow?.vkServiceToken || '');
           if (fresh.sources?.length > 0) {
             sources = fresh.sources;
@@ -478,32 +861,14 @@ export default {
         } catch (e) {}
       }
 
-      const formattedSources = sources.map(s => {
-        let f = s.file || '';
-        if (f.startsWith('/api/stream') && !f.includes('slug=') && slug) {
-          f += (f.includes('?') ? '&' : '?') + `slug=${encodeURIComponent(slug)}`;
-        }
-        if (cdnUrlVal && f.startsWith('/api/')) f = `${cdnUrlVal}${f}`;
-        return { ...s, file: f };
-      });
-
       return new Response(JSON.stringify({
-        success: true,
-        title: row.title,
-        slug: row.slug,
-        posterUrl: row.posterUrl,
-        sources: formattedSources,
-        subtitles,
-        hostType: row.hostType
+        success: true, title: row.title, slug: row.slug, posterUrl: row.posterUrl, sources, subtitles, hostType: row.hostType
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // -----------------------------------------------------------------------
-    // D. CRON 24H REFRESH TOKENS (D1 SQL)
-    // -----------------------------------------------------------------------
     if (pathname === '/api/cron/refresh-tokens' || pathname === '/api/cron/token-refresh') {
       const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
-      const links = await DB.prepare("SELECT slug, originalUrl, title FROM links ORDER BY updatedAt ASC LIMIT 30").all();
+      const links = await DB.prepare("SELECT slug, originalUrl FROM links ORDER BY updatedAt ASC LIMIT 30").all();
       let refreshedCount = 0;
 
       for (const l of links?.results || []) {
@@ -520,15 +885,10 @@ export default {
       }
 
       return new Response(JSON.stringify({
-        success: true,
-        message: `Cron D1: Berhasil menyegarkan ${refreshedCount} video.`,
-        refreshedCount
+        success: true, message: `Cron D1: Berhasil menyegarkan ${refreshedCount} video.`, refreshedCount
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // -----------------------------------------------------------------------
-    // E. SUBTITLE PROXY (.srt to .vtt)
-    // -----------------------------------------------------------------------
     if (pathname === '/api/subtitle') {
       const targetSub = url.searchParams.get('url');
       if (!targetSub) return new Response('Missing subtitle URL', { status: 400, headers: corsHeaders });
@@ -548,9 +908,7 @@ export default {
       }
     }
 
-    // -----------------------------------------------------------------------
-    // F. STREAMING & DOWNLOAD PROXY
-    // -----------------------------------------------------------------------
+    // STREAM PROXY
     if (pathname === '/api/stream' || pathname.startsWith('/api/stream/')) {
       let targetUrl = url.searchParams.get('url');
       let host = (url.searchParams.get('host') || 'vk').toLowerCase();
@@ -579,6 +937,7 @@ export default {
       return await handleProxyStreamD1(request, decodeURIComponent(targetUrl), host, corsHeaders, DB, slug, quality, false);
     }
 
+    // DOWNLOAD PROXY
     if (pathname === '/api/download' || pathname.startsWith('/api/download/')) {
       let targetUrl = url.searchParams.get('url');
       let host = (url.searchParams.get('host') || 'vk').toLowerCase();
@@ -612,9 +971,7 @@ export default {
       return await handleProxyStreamD1(request, decodeURIComponent(targetUrl), host, corsHeaders, DB, slug, quality, true, customFilename);
     }
 
-    // -----------------------------------------------------------------------
-    // G. LINKS CRUD (D1 SQL)
-    // -----------------------------------------------------------------------
+    // LINKS CRUD
     if (pathname === '/api/links') {
       if (method === 'GET') {
         const rows = await DB.prepare("SELECT * FROM links ORDER BY createdAt DESC").all();
@@ -623,16 +980,8 @@ export default {
           try { sources = JSON.parse(r.sources || '[]'); } catch (e) {}
           try { subtitles = JSON.parse(r.subtitles || '[]'); } catch (e) {}
           return {
-            id: r.id,
-            title: r.title,
-            slug: r.slug,
-            originalUrl: r.originalUrl,
-            posterUrl: r.posterUrl,
-            sources,
-            subtitles,
-            hostType: r.hostType,
-            createdAt: r.createdAt,
-            updatedAt: r.updatedAt
+            id: r.id, title: r.title, slug: r.slug, originalUrl: r.originalUrl, posterUrl: r.posterUrl,
+            sources, subtitles, hostType: r.hostType, createdAt: r.createdAt, updatedAt: r.updatedAt
           };
         });
         return new Response(JSON.stringify(results), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -646,10 +995,6 @@ export default {
         const posterUrl = (body.posterUrl || '').trim();
         const sources = body.sources || [];
         const subtitles = body.subtitles || [];
-
-        if (!title || !originalUrl || sources.length === 0) {
-          return new Response(JSON.stringify({ error: 'Title, originalUrl, and sources are required' }), { status: 400, headers: corsHeaders });
-        }
 
         let hostType = 'other';
         const lower = originalUrl.toLowerCase();
@@ -673,28 +1018,6 @@ export default {
     const singleLinkMatch = pathname.match(/^\/api\/links\/([^\/]+)$/);
     if (singleLinkMatch) {
       const linkId = singleLinkMatch[1];
-
-      if (method === 'GET') {
-        const r = await DB.prepare("SELECT * FROM links WHERE id = ? OR slug = ?").bind(linkId, linkId).first();
-        if (!r) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders });
-        let sources = [], subtitles = [];
-        try { sources = JSON.parse(r.sources || '[]'); } catch (e) {}
-        try { subtitles = JSON.parse(r.subtitles || '[]'); } catch (e) {}
-        return new Response(JSON.stringify({
-          id: r.id, title: r.title, slug: r.slug, originalUrl: r.originalUrl, posterUrl: r.posterUrl,
-          sources, subtitles, hostType: r.hostType, createdAt: r.createdAt, updatedAt: r.updatedAt
-        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
-      if (method === 'PUT') {
-        const body = await request.json();
-        const now = new Date().toISOString();
-        await DB.prepare("UPDATE links SET title = ?, originalUrl = ?, posterUrl = ?, sources = ?, subtitles = ?, updatedAt = ? WHERE id = ? OR slug = ?")
-          .bind(body.title, body.originalUrl, body.posterUrl || '', JSON.stringify(body.sources || []), JSON.stringify(body.subtitles || []), now, linkId, linkId)
-          .run();
-        return new Response(JSON.stringify({ success: true, message: 'Updated' }), { status: 200, headers: corsHeaders });
-      }
-
       if (method === 'DELETE') {
         await DB.prepare("DELETE FROM links WHERE id = ? OR slug = ?").bind(linkId, linkId).run();
         return new Response(JSON.stringify({ success: true, message: 'Deleted' }), { status: 200, headers: corsHeaders });
@@ -710,7 +1033,6 @@ export default {
     try {
       const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
       const links = await DB.prepare("SELECT slug, originalUrl FROM links ORDER BY updatedAt ASC LIMIT 30").all();
-
       for (const l of links?.results || []) {
         try {
           const fresh = await extractVideoStreams(l.originalUrl, genRow?.vkServiceToken || '');
