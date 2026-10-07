@@ -5,13 +5,10 @@
  * Semua database tersimpan di Cloudflare D1 SQL di edge, stream diproxy langsung lewat Cloudflare,
  * dan seluruh REST API serta embed player ditangani dalam 1 Worker.
  * 
- * BINDING D1 YANG DIPERLUKAN:
- * env.DB -> Cloudflare D1 Database binding ("shindora-db")
+ * BINDING D1:
+ * env.DB -> Cloudflare D1 Database binding ("shindora-stream" / ID: 330e80a6-665d-4ae9-b204-f7ce1c91a6e8)
  */
 
-// ===========================================================================
-// 1. HELPER UTILITIES & CRYPTO
-// ===========================================================================
 function generateUUID() {
   return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -62,7 +59,7 @@ async function hmacSha1Hex(key, message) {
 }
 
 // ===========================================================================
-// 2. VIDEO PARSERS (VK VIDEO, OK.RU, SIBNET) DI DALAM WORKER
+// VIDEO PARSERS (VK VIDEO, OK.RU, SIBNET)
 // ===========================================================================
 async function extractVideoStreams(url, customVkToken = '') {
   if (!url) throw new Error('URL is required');
@@ -105,7 +102,6 @@ async function extractVideoStreams(url, customVkToken = '') {
 
     let playerUrl = '';
 
-    // Official API
     if (vkToken && oid && vid) {
       try {
         const queries = accessKey ? [`${oid}_${vid}_${accessKey}`, `${oid}_${vid}`] : [`${oid}_${vid}`];
@@ -141,7 +137,6 @@ async function extractVideoStreams(url, customVkToken = '') {
       } catch (e) {}
     }
 
-    // Embed Scraper Fallback
     if (sources.length === 0 && oid && vid) {
       try {
         const embedTarget = playerUrl ? playerUrl.replace('vkvideo.ru', 'vk.com') : `https://vk.com/video_ext.php?oid=${oid}&id=${vid}${accessKey ? '&access_key=' + accessKey : ''}`;
@@ -245,14 +240,14 @@ async function extractVideoStreams(url, customVkToken = '') {
   }
 
   if (sources.length === 0) {
-    throw new Error('Gagal mengekstrak video stream dari host tersebut.');
+    throw new Error('Gagal mengekstrak video stream.');
   }
 
   return { title, posterUrl, hostType, sources };
 }
 
 // ===========================================================================
-// 3. MAIN WORKER DISPATCHER (HTTP & SCHEDULED)
+// MAIN WORKER HANDLER
 // ===========================================================================
 export default {
   async fetch(request, env, ctx) {
@@ -273,7 +268,7 @@ export default {
     }
 
     if (!DB) {
-      return new Response(JSON.stringify({ error: 'Cloudflare D1 binding (env.DB) is not attached. Please attach D1 binding in wrangler.toml or Cloudflare Dashboard.' }), {
+      return new Response(JSON.stringify({ error: 'Cloudflare D1 binding (env.DB) is not attached.' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -288,18 +283,19 @@ export default {
         const password = (body.password || '').trim();
         const remember = body.remember !== false;
 
-        const adminRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'admin'").first();
-        const adminData = adminRow ? JSON.parse(adminRow.data_json) : { username: 'admin', password: 'admin123' };
+        const adminRow = await DB.prepare("SELECT username, password FROM settings WHERE type = 'admin'").first();
+        const adminUser = adminRow?.username || 'admin';
+        const adminPass = adminRow?.password || 'admin123';
 
-        if (username === adminData.username && password === adminData.password) {
+        if (username === adminUser && password === adminPass) {
           const token = generateUUID();
           const refreshToken = generateUUID();
           const now = new Date();
           const expiresAt = new Date(now.getTime() + 3600 * 1000).toISOString();
           const refreshExpiresAt = new Date(now.getTime() + (remember ? 30 * 86400 * 1000 : 7 * 86400 * 1000)).toISOString();
 
-          await DB.prepare("INSERT INTO sessions (token, refresh_token, username, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-            .bind(token, refreshToken, username, expiresAt, refreshExpiresAt, now.toISOString())
+          await DB.prepare("INSERT INTO sessions (id, token, username, expiresAt, refreshToken, refreshExpiresAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(generateUUID(), token, username, expiresAt, refreshToken, refreshExpiresAt, now.toISOString(), now.toISOString())
             .run();
 
           const res = new Response(JSON.stringify({ success: true, user: username, token }), {
@@ -336,8 +332,8 @@ export default {
       if (!token && authHdr.startsWith('Bearer ')) token = authHdr.replace('Bearer ', '').trim();
 
       if (token) {
-        const sess = await DB.prepare("SELECT username, expires_at FROM sessions WHERE token = ?").bind(token).first();
-        if (sess && new Date(sess.expires_at) > new Date()) {
+        const sess = await DB.prepare("SELECT username, expiresAt FROM sessions WHERE token = ?").bind(token).first();
+        if (sess && new Date(sess.expiresAt) > new Date()) {
           return new Response(JSON.stringify({ authenticated: true, user: sess.username, token }), {
             status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
@@ -352,9 +348,9 @@ export default {
     // -----------------------------------------------------------------------
     if (pathname === '/api/stats' || pathname === '/api/dashboard/stats') {
       const totalRow = await DB.prepare("SELECT COUNT(*) as count FROM links").first();
-      const vkRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE host_type = 'vk' OR original_url LIKE '%vk.com%' OR original_url LIKE '%vkvideo.ru%'").first();
-      const okRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE host_type = 'ok' OR host_type = 'okru' OR original_url LIKE '%ok.ru%'").first();
-      const sibnetRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE host_type = 'sibnet' OR original_url LIKE '%sibnet.ru%'").first();
+      const vkRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE hostType = 'vk' OR originalUrl LIKE '%vk.com%' OR originalUrl LIKE '%vkvideo.ru%'").first();
+      const okRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE hostType = 'ok' OR hostType = 'okru' OR originalUrl LIKE '%ok.ru%'").first();
+      const sibnetRow = await DB.prepare("SELECT COUNT(*) as count FROM links WHERE hostType = 'sibnet' OR originalUrl LIKE '%sibnet.ru%'").first();
 
       return new Response(JSON.stringify({
         success: true,
@@ -369,20 +365,34 @@ export default {
 
     if (pathname === '/api/settings') {
       if (method === 'GET') {
-        const rows = await DB.prepare("SELECT type, data_json FROM settings").all();
-        const map = {};
-        for (const r of rows?.results || []) {
-          try { map[r.type] = JSON.parse(r.data_json); } catch (e) {}
-        }
+        const adminRow = await DB.prepare("SELECT username FROM settings WHERE type = 'admin'").first();
+        const ikRow = await DB.prepare("SELECT publicKey, urlEndpoint, privateKey FROM settings WHERE type = 'imagekit'").first();
+        const playerRow = await DB.prepare("SELECT playerType, autoplay, vastEnabled, vastTags, isAdblockEnabled FROM settings WHERE type = 'player'").first();
+        const genRow = await DB.prepare("SELECT cdnUrl, downloadCdnUrl, isCustomDownloadCdnEnabled, vkServiceToken FROM settings WHERE type = 'general'").first();
+
+        let vastTags = [];
+        try { vastTags = playerRow?.vastTags ? JSON.parse(playerRow.vastTags) : []; } catch (e) {}
+
         return new Response(JSON.stringify({
           imagekit: {
-            publicKey: map.imagekit?.publicKey || '',
-            urlEndpoint: map.imagekit?.urlEndpoint || '',
-            hasPrivateKey: !!map.imagekit?.privateKey
+            publicKey: ikRow?.publicKey || '',
+            urlEndpoint: ikRow?.urlEndpoint || '',
+            hasPrivateKey: !!ikRow?.privateKey
           },
-          admin: { username: map.admin?.username || 'admin' },
-          player: map.player || { playerType: 'jwplayer', autoplay: true, vastEnabled: false, vastTags: [], isAdblockEnabled: false },
-          general: map.general || { cdnUrl: '', downloadCdnUrl: '', isCustomDownloadCdnEnabled: false, vkServiceToken: '' }
+          admin: { username: adminRow?.username || 'admin' },
+          player: {
+            playerType: playerRow?.playerType || 'jwplayer',
+            autoplay: playerRow?.autoplay !== 0,
+            vastEnabled: playerRow?.vastEnabled === 1,
+            vastTags,
+            isAdblockEnabled: playerRow?.isAdblockEnabled === 1
+          },
+          general: {
+            cdnUrl: genRow?.cdnUrl || '',
+            downloadCdnUrl: genRow?.downloadCdnUrl || '',
+            isCustomDownloadCdnEnabled: genRow?.isCustomDownloadCdnEnabled === 1,
+            vkServiceToken: genRow?.vkServiceToken || ''
+          }
         }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -391,39 +401,38 @@ export default {
         const stype = body.settingsType;
         if (!stype) return new Response(JSON.stringify({ error: 'settingsType required' }), { status: 400, headers: corsHeaders });
 
-        let dataToSave = {};
         if (stype === 'player') {
-          dataToSave = { playerType: body.playerType || 'jwplayer', autoplay: !!body.autoplay, vastEnabled: !!body.vastEnabled, vastTags: body.vastTags || [], isAdblockEnabled: !!body.isAdblockEnabled };
+          await DB.prepare("INSERT INTO settings (id, type, playerType, autoplay, vastEnabled, vastTags, isAdblockEnabled) VALUES (?, 'player', ?, ?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET playerType=excluded.playerType, autoplay=excluded.autoplay, vastEnabled=excluded.vastEnabled, vastTags=excluded.vastTags, isAdblockEnabled=excluded.isAdblockEnabled")
+            .bind(generateUUID(), body.playerType || 'jwplayer', body.autoplay ? 1 : 0, body.vastEnabled ? 1 : 0, JSON.stringify(body.vastTags || []), body.isAdblockEnabled ? 1 : 0)
+            .run();
         } else if (stype === 'general') {
-          const old = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-          const curr = old ? JSON.parse(old.data_json) : {};
-          dataToSave = { ...curr, cdnUrl: body.cdnUrl || '', downloadCdnUrl: body.downloadCdnUrl || '', isCustomDownloadCdnEnabled: !!body.isCustomDownloadCdnEnabled, vkServiceToken: body.vkServiceToken || body.vkApiKey || '' };
+          await DB.prepare("INSERT INTO settings (id, type, cdnUrl, downloadCdnUrl, isCustomDownloadCdnEnabled, vkServiceToken) VALUES (?, 'general', ?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET cdnUrl=excluded.cdnUrl, downloadCdnUrl=excluded.downloadCdnUrl, isCustomDownloadCdnEnabled=excluded.isCustomDownloadCdnEnabled, vkServiceToken=excluded.vkServiceToken")
+            .bind(generateUUID(), body.cdnUrl || '', body.downloadCdnUrl || '', body.isCustomDownloadCdnEnabled ? 1 : 0, body.vkServiceToken || body.vkApiKey || '')
+            .run();
         } else if (stype === 'imagekit') {
-          const old = await DB.prepare("SELECT data_json FROM settings WHERE type = 'imagekit'").first();
-          const curr = old ? JSON.parse(old.data_json) : {};
-          dataToSave = { publicKey: body.publicKey || '', urlEndpoint: body.urlEndpoint || '', privateKey: (body.privateKey && body.privateKey !== '●●●●●') ? body.privateKey : (curr.privateKey || '') };
+          const old = await DB.prepare("SELECT privateKey FROM settings WHERE type = 'imagekit'").first();
+          const pKey = (body.privateKey && body.privateKey !== '●●●●●') ? body.privateKey : (old?.privateKey || '');
+          await DB.prepare("INSERT INTO settings (id, type, publicKey, privateKey, urlEndpoint) VALUES (?, 'imagekit', ?, ?, ?) ON CONFLICT(type) DO UPDATE SET publicKey=excluded.publicKey, privateKey=excluded.privateKey, urlEndpoint=excluded.urlEndpoint")
+            .bind(generateUUID(), body.publicKey || '', pKey, body.urlEndpoint || '')
+            .run();
         } else if (stype === 'admin') {
           if (!body.username || !body.password) return new Response(JSON.stringify({ error: 'Username and password required' }), { status: 400, headers: corsHeaders });
-          dataToSave = { username: body.username, password: body.password };
+          await DB.prepare("INSERT INTO settings (id, type, username, password) VALUES (?, 'admin', ?, ?) ON CONFLICT(type) DO UPDATE SET username=excluded.username, password=excluded.password")
+            .bind(generateUUID(), body.username, body.password)
+            .run();
         }
-
-        const now = new Date().toISOString();
-        await DB.prepare("INSERT INTO settings (type, data_json, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at")
-          .bind(stype, JSON.stringify(dataToSave), now, now)
-          .run();
 
         return new Response(JSON.stringify({ success: true, message: 'Settings saved' }), { status: 200, headers: corsHeaders });
       }
     }
 
     if (pathname === '/api/imagekit-auth' && method === 'GET') {
-      const row = await DB.prepare("SELECT data_json FROM settings WHERE type = 'imagekit'").first();
-      const ik = row ? JSON.parse(row.data_json) : {};
+      const ikRow = await DB.prepare("SELECT publicKey, privateKey, urlEndpoint FROM settings WHERE type = 'imagekit'").first();
       const token = generateUUID();
       const expire = Math.floor(Date.now() / 1000) + 2400;
-      const signature = await hmacSha1Hex(ik.privateKey || '', `${token}${expire}`);
+      const signature = await hmacSha1Hex(ikRow?.privateKey || '', `${token}${expire}`);
       return new Response(JSON.stringify({
-        token, expire, signature, publicKey: ik.publicKey || '', urlEndpoint: ik.urlEndpoint || ''
+        token, expire, signature, publicKey: ikRow?.publicKey || '', urlEndpoint: ikRow?.urlEndpoint || ''
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -433,9 +442,8 @@ export default {
     if (pathname === '/api/parse' && method === 'POST') {
       try {
         const body = await request.json();
-        const genRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-        const genData = genRow ? JSON.parse(genRow.data_json) : {};
-        const extracted = await extractVideoStreams(body.url, genData.vkServiceToken);
+        const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
+        const extracted = await extractVideoStreams(body.url, genRow?.vkServiceToken || '');
         return new Response(JSON.stringify(extracted), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } catch (e) {
         return new Response(JSON.stringify({ error: e.message }), { status: 422, headers: corsHeaders });
@@ -449,20 +457,21 @@ export default {
       const row = await DB.prepare("SELECT * FROM links WHERE slug = ?").bind(slug).first();
       if (!row) return new Response(JSON.stringify({ error: 'Video not found' }), { status: 404, headers: corsHeaders });
 
-      const genRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-      const genData = genRow ? JSON.parse(genRow.data_json) : {};
-      const cdnUrlVal = (genData.cdnUrl || '').replace(/\/+$/, '');
+      const genRow = await DB.prepare("SELECT cdnUrl, vkServiceToken FROM settings WHERE type = 'general'").first();
+      const cdnUrlVal = (genRow?.cdnUrl || '').replace(/\/+$/, '');
 
-      let sources = JSON.parse(row.sources_json || '[]');
-      let subtitles = JSON.parse(row.subtitles_json || '[]');
+      let sources = [];
+      let subtitles = [];
+      try { sources = JSON.parse(row.sources || '[]'); } catch (e) {}
+      try { subtitles = JSON.parse(row.subtitles || '[]'); } catch (e) {}
 
       if (force) {
         try {
-          const fresh = await extractVideoStreams(row.original_url, genData.vkServiceToken);
+          const fresh = await extractVideoStreams(row.originalUrl, genRow?.vkServiceToken || '');
           if (fresh.sources?.length > 0) {
             sources = fresh.sources;
             const now = new Date().toISOString();
-            await DB.prepare("UPDATE links SET sources_json = ?, updated_at = ? WHERE slug = ?")
+            await DB.prepare("UPDATE links SET sources = ?, updatedAt = ? WHERE slug = ?")
               .bind(JSON.stringify(fresh.sources), now, slug)
               .run();
           }
@@ -482,10 +491,10 @@ export default {
         success: true,
         title: row.title,
         slug: row.slug,
-        posterUrl: row.poster_url,
+        posterUrl: row.posterUrl,
         sources: formattedSources,
         subtitles,
-        hostType: row.host_type
+        hostType: row.hostType
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -493,18 +502,16 @@ export default {
     // D. CRON 24H REFRESH TOKENS (D1 SQL)
     // -----------------------------------------------------------------------
     if (pathname === '/api/cron/refresh-tokens' || pathname === '/api/cron/token-refresh') {
-      const genRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-      const genData = genRow ? JSON.parse(genRow.data_json) : {};
-
-      const links = await DB.prepare("SELECT slug, original_url, title FROM links ORDER BY updated_at ASC LIMIT 30").all();
+      const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
+      const links = await DB.prepare("SELECT slug, originalUrl, title FROM links ORDER BY updatedAt ASC LIMIT 30").all();
       let refreshedCount = 0;
 
       for (const l of links?.results || []) {
         try {
-          const fresh = await extractVideoStreams(l.original_url, genData.vkServiceToken);
+          const fresh = await extractVideoStreams(l.originalUrl, genRow?.vkServiceToken || '');
           if (fresh.sources?.length > 0) {
             const now = new Date().toISOString();
-            await DB.prepare("UPDATE links SET sources_json = ?, updated_at = ? WHERE slug = ?")
+            await DB.prepare("UPDATE links SET sources = ?, updatedAt = ? WHERE slug = ?")
               .bind(JSON.stringify(fresh.sources), now, l.slug)
               .run();
             refreshedCount++;
@@ -514,7 +521,7 @@ export default {
 
       return new Response(JSON.stringify({
         success: true,
-        message: `Cron D1 Selesai: Berhasil menyegarkan ${refreshedCount} video dari ${links?.results?.length || 0} tautan.`,
+        message: `Cron D1: Berhasil menyegarkan ${refreshedCount} video.`,
         refreshedCount
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -555,9 +562,10 @@ export default {
         quality = match[1].replace(/p$/i, '');
         slug = match[2].replace(/\.mp4$/, '');
 
-        const linkRow = await DB.prepare("SELECT sources_json FROM links WHERE slug = ?").bind(slug).first();
+        const linkRow = await DB.prepare("SELECT sources FROM links WHERE slug = ?").bind(slug).first();
         if (linkRow) {
-          const sources = JSON.parse(linkRow.sources_json || '[]');
+          let sources = [];
+          try { sources = JSON.parse(linkRow.sources || '[]'); } catch (e) {}
           let src = sources.find(s => s.label.toLowerCase().includes(quality.toLowerCase())) || sources[0];
           if (src?.file) {
             const p = new URL(src.file, 'http://localhost');
@@ -585,10 +593,11 @@ export default {
       }
 
       if (slug) {
-        const linkRow = await DB.prepare("SELECT title, sources_json FROM links WHERE slug = ?").bind(slug).first();
+        const linkRow = await DB.prepare("SELECT title, sources FROM links WHERE slug = ?").bind(slug).first();
         if (linkRow) {
           customFilename = formatDownloadFilename(linkRow.title || slug, quality);
-          const sources = JSON.parse(linkRow.sources_json || '[]');
+          let sources = [];
+          try { sources = JSON.parse(linkRow.sources || '[]'); } catch (e) {}
           let src = sources.find(s => s.label.toLowerCase().includes(quality.toLowerCase())) || sources[0];
           if (src?.file) {
             const p = new URL(src.file, 'http://localhost');
@@ -608,19 +617,24 @@ export default {
     // -----------------------------------------------------------------------
     if (pathname === '/api/links') {
       if (method === 'GET') {
-        const rows = await DB.prepare("SELECT * FROM links ORDER BY created_at DESC").all();
-        const results = (rows?.results || []).map(r => ({
-          id: r.id,
-          title: r.title,
-          slug: r.slug,
-          originalUrl: r.original_url,
-          posterUrl: r.poster_url,
-          sources: JSON.parse(r.sources_json || '[]'),
-          subtitles: JSON.parse(r.subtitles_json || '[]'),
-          hostType: r.host_type,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at
-        }));
+        const rows = await DB.prepare("SELECT * FROM links ORDER BY createdAt DESC").all();
+        const results = (rows?.results || []).map(r => {
+          let sources = [], subtitles = [];
+          try { sources = JSON.parse(r.sources || '[]'); } catch (e) {}
+          try { subtitles = JSON.parse(r.subtitles || '[]'); } catch (e) {}
+          return {
+            id: r.id,
+            title: r.title,
+            slug: r.slug,
+            originalUrl: r.originalUrl,
+            posterUrl: r.posterUrl,
+            sources,
+            subtitles,
+            hostType: r.hostType,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt
+          };
+        });
         return new Response(JSON.stringify(results), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -640,14 +654,14 @@ export default {
         let hostType = 'other';
         const lower = originalUrl.toLowerCase();
         if (lower.includes('vk.com') || lower.includes('vkvideo.ru')) hostType = 'vk';
-        else if (lower.includes('ok.ru')) hostType = 'okru';
+        else if (lower.includes('ok.ru')) hostType = 'ok';
         else if (lower.includes('sibnet.ru')) hostType = 'sibnet';
 
         const id = generateUUID();
         const now = new Date().toISOString();
 
-        await DB.prepare("INSERT INTO links (id, title, slug, original_url, poster_url, sources_json, subtitles_json, host_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(id, title, slug, originalUrl, posterUrl, JSON.stringify(sources), JSON.stringify(subtitles), hostType, now, now)
+        await DB.prepare("INSERT INTO links (id, title, slug, originalUrl, posterUrl, sources, hostType, createdAt, updatedAt, subtitles) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(id, title, slug, originalUrl, posterUrl, JSON.stringify(sources), hostType, now, now, JSON.stringify(subtitles))
           .run();
 
         return new Response(JSON.stringify({ id, title, slug, originalUrl, posterUrl, sources, subtitles, hostType, createdAt: now, updatedAt: now }), {
@@ -663,17 +677,19 @@ export default {
       if (method === 'GET') {
         const r = await DB.prepare("SELECT * FROM links WHERE id = ? OR slug = ?").bind(linkId, linkId).first();
         if (!r) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: corsHeaders });
+        let sources = [], subtitles = [];
+        try { sources = JSON.parse(r.sources || '[]'); } catch (e) {}
+        try { subtitles = JSON.parse(r.subtitles || '[]'); } catch (e) {}
         return new Response(JSON.stringify({
-          id: r.id, title: r.title, slug: r.slug, originalUrl: r.original_url, posterUrl: r.poster_url,
-          sources: JSON.parse(r.sources_json || '[]'), subtitles: JSON.parse(r.subtitles_json || '[]'),
-          hostType: r.host_type, createdAt: r.created_at, updatedAt: r.updated_at
+          id: r.id, title: r.title, slug: r.slug, originalUrl: r.originalUrl, posterUrl: r.posterUrl,
+          sources, subtitles, hostType: r.hostType, createdAt: r.createdAt, updatedAt: r.updatedAt
         }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       if (method === 'PUT') {
         const body = await request.json();
         const now = new Date().toISOString();
-        await DB.prepare("UPDATE links SET title = ?, original_url = ?, poster_url = ?, sources_json = ?, subtitles_json = ?, updated_at = ? WHERE id = ? OR slug = ?")
+        await DB.prepare("UPDATE links SET title = ?, originalUrl = ?, posterUrl = ?, sources = ?, subtitles = ?, updatedAt = ? WHERE id = ? OR slug = ?")
           .bind(body.title, body.originalUrl, body.posterUrl || '', JSON.stringify(body.sources || []), JSON.stringify(body.subtitles || []), now, linkId, linkId)
           .run();
         return new Response(JSON.stringify({ success: true, message: 'Updated' }), { status: 200, headers: corsHeaders });
@@ -688,23 +704,19 @@ export default {
     return new Response(JSON.stringify({ message: 'ShinDora Stream D1 Worker Active' }), { status: 200, headers: corsHeaders });
   },
 
-  // -------------------------------------------------------------------------
-  // 4. CRON SCHEDULED HANDLER (TIAP 24 JAM)
-  // -------------------------------------------------------------------------
   async scheduled(event, env, ctx) {
     const DB = env.DB;
     if (!DB) return;
     try {
-      const genRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-      const genData = genRow ? JSON.parse(genRow.data_json) : {};
-      const links = await DB.prepare("SELECT slug, original_url FROM links ORDER BY updated_at ASC LIMIT 30").all();
+      const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
+      const links = await DB.prepare("SELECT slug, originalUrl FROM links ORDER BY updatedAt ASC LIMIT 30").all();
 
       for (const l of links?.results || []) {
         try {
-          const fresh = await extractVideoStreams(l.original_url, genData.vkServiceToken);
+          const fresh = await extractVideoStreams(l.originalUrl, genRow?.vkServiceToken || '');
           if (fresh.sources?.length > 0) {
             const now = new Date().toISOString();
-            await DB.prepare("UPDATE links SET sources_json = ?, updated_at = ? WHERE slug = ?")
+            await DB.prepare("UPDATE links SET sources = ?, updatedAt = ? WHERE slug = ?")
               .bind(JSON.stringify(fresh.sources), now, l.slug)
               .run();
           }
@@ -714,9 +726,6 @@ export default {
   }
 };
 
-// ---------------------------------------------------------------------------
-// 5. STREAM & RECOVERY HANDLER WITH DIRECT D1 UPDATE
-// ---------------------------------------------------------------------------
 async function handleProxyStreamD1(request, decodedTargetUrl, host, corsHeaders, DB, slug, quality, isDownload = false, filename = '') {
   const headers = new Headers();
   headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
@@ -738,17 +747,15 @@ async function handleProxyStreamD1(request, decodedTargetUrl, host, corsHeaders,
   try {
     let upstreamRes = await fetch(decodedTargetUrl, { method: request.method, headers, redirect: 'follow' });
 
-    // Auto token recovery langsung di D1 jika 401/403/404/410
     if ((upstreamRes.status === 401 || upstreamRes.status === 403 || upstreamRes.status === 404 || upstreamRes.status === 410) && DB && slug) {
       try {
-        const linkRow = await DB.prepare("SELECT original_url FROM links WHERE slug = ?").bind(slug).first();
-        if (linkRow?.original_url) {
-          const genRow = await DB.prepare("SELECT data_json FROM settings WHERE type = 'general'").first();
-          const genData = genRow ? JSON.parse(genRow.data_json) : {};
-          const fresh = await extractVideoStreams(linkRow.original_url, genData.vkServiceToken);
+        const linkRow = await DB.prepare("SELECT originalUrl FROM links WHERE slug = ?").bind(slug).first();
+        if (linkRow?.originalUrl) {
+          const genRow = await DB.prepare("SELECT vkServiceToken FROM settings WHERE type = 'general'").first();
+          const fresh = await extractVideoStreams(linkRow.originalUrl, genRow?.vkServiceToken || '');
           if (fresh.sources?.length > 0) {
             const now = new Date().toISOString();
-            await DB.prepare("UPDATE links SET sources_json = ?, updated_at = ? WHERE slug = ?")
+            await DB.prepare("UPDATE links SET sources = ?, updatedAt = ? WHERE slug = ?")
               .bind(JSON.stringify(fresh.sources), now, slug)
               .run();
 

@@ -1,12 +1,12 @@
-name = "shindora-stream-d1"
+name = "shindora-cloudflare"
 main = "cloudflare-worker-d1.js"
 compatibility_date = "2026-01-01"
 
 # BINDING CLOUDFLARE D1 SQL DATABASE
 [[d1_databases]]
 binding = "DB"
-database_name = "shindora-db"
-database_id = "shindora-db-id"
+database_name = "shindora-stream"
+database_id = "330e80a6-665d-4ae9-b204-f7ce1c91a6e8"
 
 # Cron Trigger 24 Jam untuk Auto Token Refresh
 [triggers]
