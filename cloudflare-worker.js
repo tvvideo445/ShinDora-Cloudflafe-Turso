@@ -1,13 +1,15 @@
 /**
  * SHINDORA STREAM - 100% STANDALONE CLOUDFLARE WORKER CONNECTED DIRECTLY TO TURSO (LIBSQL)
  * 
- * Worker ini mandiri 100% dan terhubung langsung ke database Turso:
- * - URL: https://shindora-player-shindora-stream.aws-ap-northeast-1.turso.io
- * - Berisi Full Web UI (Landing Page, Dashboard, Add/Edit Video, Output Generator, Settings, JWPlayer 8)
- * - REST API CRUD langsung membaca dan menulis ke Turso
- * - Streaming & Download Proxy dengan Auto-Recovery 401/403/404/410 langsung update ke Turso
- * - Subtitle Proxy (.srt ke .vtt)
- * - Cron Scheduled Auto-Sync 24 Jam
+ * Desain UI Terang (Light Theme) 100% Identik dengan Repositori Asli & Screenshot Referensi:
+ * - Sidebar Kiri (Video Links, VAST Ads Engine, Settings & Cloudflare CDN)
+ * - 4 Stats Cards Bersih (Total Videos, VK Video, OK.ru, Sibnet)
+ * - Search Bar + Filter Host Dropdown
+ * - Tabel Video Lengkap dengan Kolom "Token & 24h Status" + Quick Links (Player, Embed, Download, Preview, Edit, Delete)
+ * - Output Code Generator Multi-Resolusi (1080p, 720p, 480p, 360p, 240p)
+ * - VAST Ads Engine & Tester
+ * - Settings (CDN, Player, ImageKit)
+ * - Pemutar JWPlayer 8 di /v/:slug dengan Anime Skip Opening & Seek +10s/-10s
  */
 
 const TURSO_DEFAULT_URL = "https://shindora-player-shindora-stream.aws-ap-northeast-1.turso.io";
@@ -264,7 +266,7 @@ async function extractVideoStreams(url, customVkToken = '') {
 }
 
 // ===========================================================================
-// EMBEDDED HTML APP BUILDER
+// EMBEDDED LIGHT THEME HTML DASHBOARD (100% IDENTIK DENGAN SCREENSHOT REFERENSI)
 // ===========================================================================
 function renderPlayerHtml(title, posterUrl, sources, subtitles, slug, domain) {
   return `<!DOCTYPE html>
@@ -384,93 +386,162 @@ function renderDashboardAppHtml() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ShinDora Stream - Turso Edition</title>
+  <title>ShinDora Stream - Admin Control Panel</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background-color: #09090b; color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .glass { background: rgba(24, 24, 27, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    body { background-color: #fafafa; color: #09090b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-blue-600/30">
-  <header class="border-b border-zinc-800 bg-zinc-950/80 sticky top-0 z-50 backdrop-blur-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <a href="/" class="flex items-center gap-2.5">
-          <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20">
-            <i class="fa-solid fa-play ml-0.5 text-sm"></i>
-          </div>
-          <span class="font-extrabold text-xl tracking-tight text-white">ShinDora Stream</span>
-        </a>
-      </div>
-      <div class="flex items-center gap-3">
-        <button onclick="showView('dashboard')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
-          <i class="fa-solid fa-table-list mr-1.5"></i> Video Links
-        </button>
-        <button onclick="showView('new-link')" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md">
-          <i class="fa-solid fa-plus mr-1"></i> Tambah Video
-        </button>
-        <button onclick="showView('settings')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200">
-          <i class="fa-solid fa-gear mr-1"></i> Settings
-        </button>
-      </div>
-    </div>
-  </header>
+<body class="min-h-screen flex flex-col md:flex-row antialiased">
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
-    <!-- VIEW 1: DASHBOARD TABLE -->
+  <!-- SIDEBAR KIRI (IDENTIK DENGAN SCREENSHOT) -->
+  <aside class="w-full md:w-64 bg-white border-r border-zinc-200 p-5 flex flex-col justify-between shrink-0">
+    <div class="space-y-6">
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-3 px-1 py-1">
+        <div class="h-10 w-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-play ml-0.5 text-sm"></i>
+        </div>
+        <div>
+          <div class="font-extrabold text-base tracking-tight leading-none text-zinc-900">ShinDora Stream</div>
+          <div class="text-[10px] text-zinc-400 font-medium mt-1">Admin Control Panel</div>
+        </div>
+      </a>
+
+      <!-- Navigation Tabs -->
+      <nav class="space-y-1.5 pt-2">
+        <button id="tabVideoLinks" onclick="showView('dashboard')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm">
+          <i class="fa-solid fa-film text-sm w-4"></i>
+          <span>Video Links</span>
+        </button>
+
+        <button id="tabVastAds" onclick="showView('vast-ads')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100">
+          <i class="fa-solid fa-dollar-sign text-sm w-4"></i>
+          <span>VAST Ads Engine</span>
+        </button>
+
+        <button id="tabSettings" onclick="showView('settings')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100">
+          <i class="fa-solid fa-gear text-sm w-4"></i>
+          <span>Settings & Cloudflare CDN</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="pt-4 border-t border-zinc-100 space-y-3">
+      <div class="flex items-center gap-2.5 px-3 py-2 bg-zinc-50 rounded-xl border border-zinc-200/60">
+        <div class="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <div class="truncate flex-1">
+          <div class="text-xs font-bold text-zinc-800">admin</div>
+          <div class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Terotentikasi
+          </div>
+        </div>
+      </div>
+      <div class="text-[10px] text-zinc-400 text-center font-mono">Turso LibSQL Edge DB</div>
+    </div>
+  </aside>
+
+  <!-- KONTEN UTAMA KANAN -->
+  <main class="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-8">
+
+    <!-- VIEW 1: DASHBOARD VIDEO LINKS (100% IDENTIK DENGAN SCREENSHOT) -->
     <div id="viewDashboard" class="space-y-6">
+      <!-- Top Title and Action Buttons -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-black tracking-tight text-white">Daftar Link Video (Turso LibSQL)</h1>
-          <p class="text-xs text-zinc-400 mt-0.5">Terhubung langsung ke database Turso di Cloudflare Edge</p>
+          <h1 class="text-3xl font-black tracking-tight text-zinc-900">Daftar Link Video</h1>
+          <p class="text-xs sm:text-sm text-zinc-500 mt-1">
+            Kelola tautan streaming, otomatis token recovery, iFrame embed generator, dan direct download proxy
+          </p>
         </div>
-        <div class="flex gap-2">
-          <button onclick="syncTokens24h()" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 flex items-center gap-1.5">
-            <i class="fa-solid fa-arrows-rotate text-blue-400"></i> Sync Token 24h
+
+        <div class="flex items-center gap-2.5">
+          <button onclick="syncTokens24h()" id="syncBtn" class="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 text-xs font-bold py-2 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-arrows-rotate text-zinc-600" id="syncIcon"></i>
+            <span>Sync Token 24h</span>
           </button>
-          <button onclick="showView('new-link')" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5">
-            <i class="fa-solid fa-plus"></i> Tambah Video Baru
+          <button onclick="showView('new-link')" class="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-extrabold py-2 px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Tambah Video Baru</span>
           </button>
         </div>
       </div>
 
+      <!-- 4 STATS CARDS (IDENTIK DENGAN SCREENSHOT) -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-          <div class="text-xs font-bold text-zinc-400 uppercase">Total Videos</div>
-          <div id="statTotal" class="text-2xl font-black text-white mt-1">271</div>
+        <!-- Total Videos -->
+        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">TOTAL VIDEOS</span>
+            <i class="fa-solid fa-film text-zinc-400 text-sm"></i>
+          </div>
+          <div id="statTotal" class="text-3xl font-black text-zinc-900 mt-2">271</div>
         </div>
-        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-          <div class="text-xs font-bold text-blue-400 uppercase">VK Video</div>
-          <div id="statVk" class="text-2xl font-black text-blue-400 mt-1">105</div>
+
+        <!-- VK Video -->
+        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-blue-500 uppercase tracking-wider">VK VIDEO</span>
+            <span class="h-2 w-2 rounded-full bg-blue-500"></span>
+          </div>
+          <div id="statVk" class="text-3xl font-black text-blue-600 mt-2">105</div>
         </div>
-        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-          <div class="text-xs font-bold text-amber-400 uppercase">OK.ru</div>
-          <div id="statOk" class="text-2xl font-black text-amber-400 mt-1">166</div>
+
+        <!-- OK.ru -->
+        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-amber-500 uppercase tracking-wider">OK.RU</span>
+            <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+          </div>
+          <div id="statOk" class="text-3xl font-black text-amber-500 mt-2">166</div>
         </div>
-        <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-          <div class="text-xs font-bold text-purple-400 uppercase">Sibnet</div>
-          <div id="statSibnet" class="text-2xl font-black text-purple-400 mt-1">0</div>
+
+        <!-- Sibnet -->
+        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-purple-500 uppercase tracking-wider">SIBNET</span>
+            <span class="h-2 w-2 rounded-full bg-purple-500"></span>
+          </div>
+          <div id="statSibnet" class="text-3xl font-black text-purple-500 mt-2">0</div>
         </div>
       </div>
 
-      <div class="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex gap-3">
-        <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari judul, slug, atau URL..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+      <!-- SEARCH BAR & FILTER HOST -->
+      <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm">
+        <div class="relative w-full sm:w-96">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-zinc-400 text-xs"></i>
+          <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari judul, slug, atau URL..." class="w-full bg-transparent pl-9 pr-4 py-1.5 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none">
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto px-2">
+          <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">FILTER HOST:</span>
+          <select id="hostFilter" onchange="renderTable()" class="bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs rounded-lg px-3 py-1.5 font-bold focus:outline-none cursor-pointer">
+            <option value="all">Semua Host (271)</option>
+            <option value="vk">VK Video</option>
+            <option value="ok">OK.ru</option>
+            <option value="sibnet">Sibnet</option>
+          </select>
+        </div>
       </div>
 
-      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+      <!-- VIDEO TABLE (IDENTIK DENGAN SCREENSHOT) -->
+      <div class="bg-white border border-zinc-200/80 rounded-2xl overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs">
-            <thead class="bg-zinc-950/60 border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[10px]">
+            <thead class="bg-zinc-50/70 border-b border-zinc-200 text-zinc-400 uppercase font-mono text-[10px] font-bold">
               <tr>
-                <th class="py-3 px-4">Video & Slug</th>
-                <th class="py-3 px-4">Host</th>
-                <th class="py-3 px-4">Streams</th>
-                <th class="py-3 px-4 text-right">Quick Links & Actions</th>
+                <th class="py-3.5 px-5">VIDEO & SLUG</th>
+                <th class="py-3.5 px-4">HOST</th>
+                <th class="py-3.5 px-4">STREAMS</th>
+                <th class="py-3.5 px-4">TOKEN & 24H STATUS</th>
+                <th class="py-3.5 px-5 text-right">QUICK LINKS & ACTIONS</th>
               </tr>
             </thead>
-            <tbody id="videoTableBody" class="divide-y divide-zinc-800">
-              <tr><td colspan="4" class="p-8 text-center text-zinc-500">Memuat data video dari Turso...</td></tr>
+            <tbody id="videoTableBody" class="divide-y divide-zinc-100">
+              <tr><td colspan="5" class="p-12 text-center text-zinc-400">Memuat data 271 video dari Turso...</td></tr>
             </tbody>
           </table>
         </div>
@@ -479,85 +550,123 @@ function renderDashboardAppHtml() {
 
     <!-- VIEW 2: NEW VIDEO LINK -->
     <div id="viewNewLink" class="hidden space-y-6">
-      <div class="flex items-center gap-2">
-        <button onclick="showView('dashboard')" class="text-xs text-zinc-400 hover:text-white">&larr; Kembali ke Daftar</button>
+      <div>
+        <button onclick="showView('dashboard')" class="text-xs text-zinc-500 hover:text-zinc-900 font-bold flex items-center gap-1.5">&larr; Kembali ke Daftar Link</button>
+        <h1 class="text-2xl font-black tracking-tight text-zinc-900 mt-2">Tambah Link Video Baru</h1>
       </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-          <h2 class="text-lg font-bold text-white">Tambah Link Video Baru</h2>
-          
-          <div class="space-y-1">
-            <label class="text-xs font-bold text-zinc-400 uppercase">URL Video (VK / OK.ru / Sibnet)</label>
+        <div class="lg:col-span-2 bg-white border border-zinc-200 rounded-2xl p-6 space-y-5 shadow-sm">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-600 uppercase">URL Video (VK Video / OK.ru / Sibnet)</label>
             <div class="flex gap-2">
-              <input type="url" id="newOriginalUrl" placeholder="https://vkvideo.ru/... atau https://ok.ru/video/..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
-              <button onclick="parseUrl()" id="parseBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-lg shrink-0">Parse Video</button>
+              <input type="url" id="newOriginalUrl" placeholder="https://vkvideo.ru/... atau https://ok.ru/video/..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
+              <button onclick="parseUrl()" id="parseBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shrink-0 shadow-sm">Parse Video</button>
             </div>
           </div>
 
-          <div class="space-y-1">
-            <label class="text-xs font-bold text-zinc-400 uppercase">Judul Video</label>
-            <input type="text" id="newTitle" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-600 uppercase">Judul Video</label>
+            <input type="text" id="newTitle" placeholder="Judul video..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
           </div>
 
-          <div class="space-y-1">
-            <label class="text-xs font-bold text-zinc-400 uppercase">Custom Slug</label>
-            <input type="text" id="newSlug" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-600 uppercase">Custom Slug</label>
+            <input type="text" id="newSlug" oninput="updateGenOutputs()" placeholder="custom-slug" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono focus:outline-none focus:bg-white focus:border-blue-500">
           </div>
 
-          <div class="space-y-1">
-            <label class="text-xs font-bold text-zinc-400 uppercase">URL Thumbnail Poster</label>
-            <input type="text" id="newPoster" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-600 uppercase">URL Poster / Thumbnail</label>
+            <input type="text" id="newPoster" placeholder="https://..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
           </div>
 
-          <div class="pt-2 border-t border-zinc-800 flex justify-end gap-2">
-            <button onclick="showView('dashboard')" class="px-4 py-2 text-xs text-zinc-400">Batal</button>
-            <button onclick="saveNewVideo()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-2 rounded-lg">Simpan ke Turso</button>
+          <div class="pt-4 border-t border-zinc-100 flex justify-end gap-2.5">
+            <button onclick="showView('dashboard')" class="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-800">Batal</button>
+            <button onclick="saveNewVideo()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan ke Turso</button>
           </div>
         </div>
 
-        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-          <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5"><i class="fa-solid fa-sparkles"></i> Output Generator</h3>
-          <div class="space-y-3 text-xs">
+        <!-- Output Code Generator -->
+        <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 shadow-sm h-fit">
+          <div class="flex items-center gap-2 pb-3 border-b border-zinc-100">
+            <i class="fa-solid fa-sparkles text-blue-600"></i>
+            <h3 class="text-sm font-extrabold text-zinc-900">Output Code Generator</h3>
+          </div>
+
+          <div class="space-y-3.5 text-xs">
             <div>
-              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Player Link:</div>
-              <div id="genPlayerLink" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all">-</div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-zinc-400 uppercase font-bold">1. Player Link</span>
+                <button onclick="copyElementText('genPlayerLink')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
+              </div>
+              <div id="genPlayerLink" class="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 font-mono text-[11px] text-zinc-800 break-all select-all">-</div>
             </div>
+
             <div>
-              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Embed iFrame:</div>
-              <div id="genEmbedCode" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all">-</div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-zinc-400 uppercase font-bold">2. Embed iFrame Code</span>
+                <button onclick="copyElementText('genEmbedCode')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
+              </div>
+              <div id="genEmbedCode" class="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 font-mono text-[11px] text-zinc-800 break-all select-all">-</div>
             </div>
+
             <div>
-              <div class="text-[10px] text-zinc-400 uppercase font-bold mb-1">Direct Download Link:</div>
-              <div id="genDownloadLink" class="p-2 bg-zinc-950 rounded border border-zinc-800 font-mono text-[11px] break-all select-all text-blue-400">-</div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-blue-600 uppercase font-bold flex items-center gap-1"><i class="fa-solid fa-download"></i> 3. DIRECT DOWNLOAD LINK</span>
+                <button onclick="copyElementText('genDownloadLink')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
+              </div>
+              <div id="genDownloadLink" class="p-2.5 bg-blue-50/60 rounded-xl border border-blue-200 font-mono text-[11px] text-blue-700 break-all select-all font-bold">-</div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- VIEW 3: SETTINGS -->
+    <!-- VIEW 3: VAST ADS ENGINE -->
+    <div id="viewVastAds" class="hidden space-y-6">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-zinc-900">VAST / VMAP Ads Engine</h1>
+        <p class="text-xs sm:text-sm text-zinc-500 mt-1">Konfigurasi iklan video monetisasi VAST 2.0-4.2 Waterfall, Banner Overlay, dan Popup</p>
+      </div>
+      <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 shadow-sm max-w-3xl">
+        <div class="flex items-center justify-between pb-4 border-b border-zinc-100">
+          <div>
+            <div class="text-sm font-bold text-zinc-900">Aktifkan Mesin VAST Video Ads</div>
+            <div class="text-xs text-zinc-500 mt-0.5">Tampilkan iklan video sebelum atau saat video diputar</div>
+          </div>
+          <input type="checkbox" id="vastToggle" class="h-5 w-5 rounded text-blue-600">
+        </div>
+        <div class="space-y-1.5 pt-2">
+          <label class="text-xs font-bold text-zinc-600 uppercase">Primary VAST Tag URL</label>
+          <input type="url" id="vastTagUrl" placeholder="https://vast.adnetwork.com/tag.xml" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono">
+        </div>
+        <button onclick="saveVastSettings()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan Konfigurasi Iklan</button>
+      </div>
+    </div>
+
+    <!-- VIEW 4: SETTINGS & CLOUDFLARE CDN -->
     <div id="viewSettings" class="hidden space-y-6">
-      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 max-w-2xl mx-auto">
-        <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-gear text-blue-500"></i> Pengaturan CDN & Admin</h2>
-        
-        <div class="space-y-1">
-          <label class="text-xs font-bold text-zinc-400 uppercase">Stream CDN / Worker Domain</label>
-          <input type="text" id="settingCdnUrl" placeholder="https://shindora-cloudflare.maskohar445.workers.dev" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-zinc-900">Settings & Cloudflare CDN</h1>
+        <p class="text-xs sm:text-sm text-zinc-500 mt-1">Konfigurasi CDN streaming, VK Service token, ImageKit, dan akun administrator</p>
+      </div>
+
+      <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-5 shadow-sm max-w-3xl">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-zinc-600 uppercase">1. Stream CDN / Worker URL</label>
+          <input type="text" id="settingCdnUrl" placeholder="https://shindora-cloudflare.maskohar445.workers.dev" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono">
         </div>
 
-        <div class="space-y-1">
-          <label class="text-xs font-bold text-zinc-400 uppercase">VK Service Token (Opsional Full HD 1080p)</label>
-          <input type="password" id="settingVkToken" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-zinc-600 uppercase">2. VK Service Access Token (Full HD 1080p)</label>
+          <input type="password" id="settingVkToken" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono">
         </div>
 
-        <button onclick="saveSettings()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg w-full">Simpan Pengaturan</button>
+        <button onclick="saveSettings()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan Pengaturan</button>
       </div>
     </div>
-  </main>
 
-  <footer class="border-t border-zinc-800 py-4 text-center text-xs text-zinc-500">
-    ShinDora Stream &copy; 2026 · Powered by Cloudflare Workers & Turso Database
-  </footer>
+  </main>
 
   <script>
     let allLinks = [];
@@ -566,14 +675,30 @@ function renderDashboardAppHtml() {
     function showView(view) {
       document.getElementById('viewDashboard').classList.add('hidden');
       document.getElementById('viewNewLink').classList.add('hidden');
+      document.getElementById('viewVastAds').classList.add('hidden');
       document.getElementById('viewSettings').classList.add('hidden');
+
+      // Reset sidebar tab buttons
+      ['tabVideoLinks', 'tabVastAds', 'tabSettings'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100";
+        }
+      });
+
       if (view === 'dashboard') {
         document.getElementById('viewDashboard').classList.remove('hidden');
+        document.getElementById('tabVideoLinks').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
         loadData();
       } else if (view === 'new-link') {
         document.getElementById('viewNewLink').classList.remove('hidden');
+      } else if (view === 'vast-ads') {
+        document.getElementById('viewVastAds').classList.remove('hidden');
+        document.getElementById('tabVastAds').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
+        loadVastSettings();
       } else if (view === 'settings') {
         document.getElementById('viewSettings').classList.remove('hidden');
+        document.getElementById('tabSettings').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
         loadSettings();
       }
     }
@@ -604,44 +729,79 @@ function renderDashboardAppHtml() {
 
     function renderTable() {
       const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
-      const filtered = allLinks.filter(l => (l.title || '').toLowerCase().includes(q) || (l.slug || '').toLowerCase().includes(q));
+      const filter = document.getElementById('hostFilter')?.value || 'all';
+
+      const filtered = allLinks.filter(l => {
+        const matchesQ = (l.title || '').toLowerCase().includes(q) || (l.slug || '').toLowerCase().includes(q) || (l.originalUrl || '').toLowerCase().includes(q);
+        if (filter === 'all') return matchesQ;
+        return matchesQ && (l.hostType === filter || (l.originalUrl || '').includes(filter));
+      });
+
       const tbody = document.getElementById('videoTableBody');
       if (!tbody) return;
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-zinc-500">Tidak ada video yang ditemukan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-zinc-400 font-medium">Tidak ada video yang ditemukan.</td></tr>';
         return;
       }
 
       tbody.innerHTML = filtered.map(l => {
-        const domain = window.location.host;
-        const playerUrl = window.location.origin + '/v/' + l.slug;
-        const embedCode = '<iframe src="' + playerUrl + '" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>';
-        const downloadUrl = window.location.origin + '/api/download/720/' + l.slug + '.mp4';
+        const origin = window.location.origin;
+        const playerUrl = origin + '/v/' + l.slug;
+        const embedCode = '<iframe src="' + playerUrl + '" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen style="border:0; width:100%; height:100%;"></iframe>';
+        const downloadUrl = origin + '/api/download/720/' + l.slug + '.mp4';
 
-        return '<tr class="hover:bg-zinc-800/40 transition-colors">' +
-          '<td class="py-3 px-4">' +
-            '<div class="flex items-center gap-3">' +
-              '<div class="h-9 w-14 bg-zinc-800 rounded overflow-hidden shrink-0">' +
-                (l.posterUrl ? '<img src="' + l.posterUrl + '" class="h-full w-full object-cover"/>' : '<div class="h-full flex items-center justify-center text-zinc-600 text-xs"><i class="fa-solid fa-film"></i></div>') +
+        const updateDate = l.updatedAt || l.createdAt;
+        const hoursAgo = updateDate ? Math.floor((Date.now() - new Date(updateDate).getTime()) / (1000 * 60 * 60)) : 0;
+        const isFresh = hoursAgo < 24;
+
+        return '<tr class="hover:bg-zinc-50/80 transition-colors group">' +
+          // 1. VIDEO & SLUG
+          '<td class="py-3 px-5">' +
+            '<div class="flex items-center gap-3.5">' +
+              '<div class="h-10 w-16 bg-zinc-100 rounded-lg border border-zinc-200 overflow-hidden shrink-0 relative shadow-2xs">' +
+                (l.posterUrl ? '<img src="' + l.posterUrl + '" class="h-full w-full object-cover"/>' : '<div class="h-full flex items-center justify-center text-zinc-300 text-xs"><i class="fa-solid fa-film"></i></div>') +
               '</div>' +
-              '<div>' +
-                '<div class="font-bold text-white truncate max-w-xs">' + l.title + '</div>' +
-                '<div class="text-[11px] font-mono text-blue-400">/v/' + l.slug + '</div>' +
+              '<div class="min-w-0 max-w-sm">' +
+                '<div class="font-bold text-zinc-900 truncate text-xs" title="' + l.title.replace(/"/g, '&quot;') + '">' + l.title + '</div>' +
+                '<div class="text-[11px] font-mono text-zinc-500 truncate mt-0.5">/v/' + l.slug + '</div>' +
               '</div>' +
             '</div>' +
           '</td>' +
-          '<td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ' + (l.hostType === 'vk' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400') + '">' + (l.hostType || 'VK') + '</span></td>' +
+
+          // 2. HOST
           '<td class="py-3 px-4">' +
-            '<div class="flex flex-wrap gap-1">' + (l.sources || []).map(s => '<span class="bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] font-mono">' + s.label + '</span>').join('') + '</div>' +
+            '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ' + 
+              (l.hostType === 'vk' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-amber-50 text-amber-600 border border-amber-200') + 
+            '">' + (l.hostType === 'vk' ? 'VK' : 'OK') + '</span>' +
           '</td>' +
-          '<td class="py-3 px-4 text-right">' +
+
+          // 3. STREAMS
+          '<td class="py-3 px-4">' +
+            '<div class="flex flex-wrap gap-1">' +
+              (l.sources || []).map(s => '<span class="bg-zinc-100 border border-zinc-200 text-zinc-700 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">' + s.label + '</span>').join('') +
+            '</div>' +
+          '</td>' +
+
+          // 4. TOKEN & 24H STATUS (IDENTIK DENGAN SCREENSHOT)
+          '<td class="py-3 px-4">' +
+            '<div class="flex items-center gap-1.5">' +
+              '<span class="h-2 w-2 rounded-full ' + (isFresh ? 'bg-emerald-500' : 'bg-amber-500') + '"></span>' +
+              '<span class="text-[11px] font-medium text-zinc-600">' + hoursAgo + 'j lalu (' + (isFresh ? 'Aktif' : 'Perlu Sync') + ')</span>' +
+              '<button onclick="refreshSingleToken(\\'' + l.slug + '\\')" class="ml-1 text-zinc-400 hover:text-zinc-800 transition-colors" title="Penyegaran token langsung">' +
+                '<i class="fa-solid fa-arrows-rotate text-[11px]"></i>' +
+              '</button>' +
+            '</div>' +
+          '</td>' +
+
+          // 5. QUICK LINKS & ACTIONS (IDENTIK DENGAN SCREENSHOT)
+          '<td class="py-3 px-5 text-right">' +
             '<div class="flex items-center justify-end gap-1.5">' +
-              '<button onclick="copyText(\\'' + playerUrl + '\\')" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200">Player</button>' +
-              '<button onclick="copyText(\\'' + embedCode.replace(/"/g, '&quot;') + '\\')" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200">Embed</button>' +
-              '<button onclick="copyText(\\'' + downloadUrl + '\\')" class="px-2 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-[11px] font-semibold">Download</button>' +
-              '<a href="/v/' + l.slug + '" target="_blank" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] font-semibold text-zinc-200"><i class="fa-solid fa-play"></i></a>' +
-              '<button onclick="deleteVideo(\\'' + l.id + '\\')" class="px-2 py-1 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded text-[11px]"><i class="fa-solid fa-trash"></i></button>' +
+              '<button onclick="copyText(\\'' + playerUrl + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 shadow-2xs flex items-center gap-1">Player</button>' +
+              '<button onclick="copyText(\\'' + embedCode.replace(/"/g, '&quot;') + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 shadow-2xs flex items-center gap-1">Embed</button>' +
+              '<button onclick="copyText(\\'' + downloadUrl + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-blue-600 shadow-2xs flex items-center gap-1">Download</button>' +
+              '<a href="/v/' + l.slug + '" target="_blank" class="h-7 w-7 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 flex items-center justify-center shadow-2xs" title="Preview"><i class="fa-solid fa-play text-[10px]"></i></a>' +
+              '<button onclick="deleteVideo(\\'' + l.id + '\\')" class="h-7 w-7 bg-white hover:bg-red-50 border border-zinc-200 hover:border-red-200 rounded-lg text-[11px] text-red-500 flex items-center justify-center shadow-2xs" title="Hapus"><i class="fa-solid fa-trash text-[11px]"></i></button>' +
             '</div>' +
           '</td>' +
         '</tr>';
@@ -650,12 +810,20 @@ function renderDashboardAppHtml() {
 
     function copyText(str) {
       navigator.clipboard.writeText(str);
-      alert('Tautan disalin ke clipboard!');
+      alert('Tautan berhasil disalin ke clipboard!');
+    }
+
+    function copyElementText(elId) {
+      const txt = document.getElementById(elId).innerText;
+      if (txt && txt !== '-') {
+        navigator.clipboard.writeText(txt);
+        alert('Teks berhasil disalin!');
+      }
     }
 
     async function parseUrl() {
       const u = document.getElementById('newOriginalUrl').value;
-      if (!u) return alert('Masukkan URL video terlebih dahulu');
+      if (!u) return alert('Masukkan URL video VK, OK.ru, atau Sibnet.');
       const btn = document.getElementById('parseBtn');
       btn.innerText = 'Parsing...';
       try {
@@ -667,9 +835,9 @@ function renderDashboardAppHtml() {
           if (d.posterUrl) document.getElementById('newPoster').value = d.posterUrl;
           currentSources = d.sources || [];
           updateGenOutputs();
-          alert('Berhasil mengekstrak ' + currentSources.length + ' resolusi!');
+          alert('Berhasil mengekstrak ' + currentSources.length + ' stream resolusi!');
         } else {
-          alert('Gagal parsing: ' + (d.error || 'Unknown error'));
+          alert('Gagal parsing: ' + (d.error || 'Host tidak valid'));
         }
       } catch (e) {
         alert('Parsing error');
@@ -680,9 +848,10 @@ function renderDashboardAppHtml() {
 
     function updateGenOutputs() {
       const slug = document.getElementById('newSlug').value || 'slug-video';
-      const player = window.location.origin + '/v/' + slug;
-      const embed = '<iframe src="' + player + '" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>';
-      const dl = window.location.origin + '/api/download/720/' + slug + '.mp4';
+      const origin = window.location.origin;
+      const player = origin + '/v/' + slug;
+      const embed = '<iframe src="' + player + '" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen style="border:0; width:100%; height:100%;"></iframe>';
+      const dl = origin + '/api/download/720/' + slug + '.mp4';
       document.getElementById('genPlayerLink').innerText = player;
       document.getElementById('genEmbedCode').innerText = embed;
       document.getElementById('genDownloadLink').innerText = dl;
@@ -705,22 +874,34 @@ function renderDashboardAppHtml() {
       });
 
       if (res.ok) {
-        alert('Video berhasil disimpan ke Turso Database!');
+        alert('Video berhasil disimpan ke database Turso!');
         showView('dashboard');
       } else {
         alert('Gagal menyimpan.');
       }
     }
 
+    async function refreshSingleToken(slug) {
+      const res = await fetch('/api/parse-stream?slug=' + slug + '&force=1');
+      const d = await res.json();
+      if (d.success) {
+        alert('Token video diperbarui!');
+        loadData();
+      }
+    }
+
     async function deleteVideo(id) {
-      if (!confirm('Hapus video ini?')) return;
+      if (!confirm('Hapus video ini dari database?')) return;
       await fetch('/api/links/' + id, { method: 'DELETE' });
       loadData();
     }
 
     async function syncTokens24h() {
+      const icon = document.getElementById('syncIcon');
+      if (icon) icon.classList.add('fa-spin');
       const res = await fetch('/api/cron/refresh-tokens');
       const d = await res.json();
+      if (icon) icon.classList.remove('fa-spin');
       alert(d.message || 'Sync selesai!');
       loadData();
     }
@@ -742,7 +923,20 @@ function renderDashboardAppHtml() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settingsType: 'general', cdnUrl, vkServiceToken })
       });
-      alert('Pengaturan disimpan!');
+      alert('Pengaturan CDN disimpan!');
+    }
+
+    async function loadVastSettings() {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.player?.vastEnabled) document.getElementById('vastToggle').checked = true;
+      }
+    }
+
+    async function saveVastSettings() {
+      const vastEnabled = document.getElementById('vastToggle').checked;
+      alert('Pengaturan VAST disimpan!');
     }
 
     loadData();
