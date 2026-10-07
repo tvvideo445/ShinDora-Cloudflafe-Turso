@@ -1,13 +1,10 @@
 name = "shindora-cloudflare"
-main = "cloudflare-worker-d1.js"
+main = "cloudflare-worker.js"
 compatibility_date = "2026-01-01"
 
-# BINDING CLOUDFLARE D1 SQL DATABASE
-[[d1_databases]]
-binding = "DB"
-database_name = "shindora-stream"
-database_id = "330e80a6-665d-4ae9-b204-f7ce1c91a6e8"
+[vars]
+ORIGIN_APP_URL = "https://e127797a-9d93-4499-be31-b84492eb6a96.preview.emergentagent.com"
 
-# Cron Trigger 24 Jam untuk Auto Token Refresh
+# Cron Trigger 24 Jam untuk Auto Refresh Token Expired
 [triggers]
 crons = ["0 0 * * *"]
