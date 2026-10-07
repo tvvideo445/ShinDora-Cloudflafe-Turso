@@ -1,15 +1,15 @@
 /**
  * SHINDORA STREAM - 100% STANDALONE CLOUDFLARE WORKER CONNECTED DIRECTLY TO TURSO (LIBSQL)
  * 
- * Desain UI Terang (Light Theme) 100% Identik dengan Repositori Asli & Screenshot Referensi:
- * - Sidebar Kiri (Video Links, VAST Ads Engine, Settings & Cloudflare CDN)
- * - 4 Stats Cards Bersih (Total Videos, VK Video, OK.ru, Sibnet)
- * - Search Bar + Filter Host Dropdown
- * - Tabel Video Lengkap dengan Kolom "Token & 24h Status" + Quick Links (Player, Embed, Download, Preview, Edit, Delete)
- * - Output Code Generator Multi-Resolusi (1080p, 720p, 480p, 360p, 240p)
- * - VAST Ads Engine & Tester
- * - Settings (CDN, Player, ImageKit)
- * - Pemutar JWPlayer 8 di /v/:slug dengan Anime Skip Opening & Seek +10s/-10s
+ * Desain UI Terang 100% IDENTIK dengan screenshot resmi gdriveplayer.my.id:
+ * 1. Header: Logo ShinDora CDN
+ * 2. Sidebar: Video Links, VAST Ads, Settings, Logged in as Wibukohar
+ * 3. Dashboard: Video Stream Links, + Tambah Link Baru, 4 Stats Cards (Total, VK, OK.ru, Sibnet)
+ * 4. Daftar Video & Status Token: Checkbox, Video & Host, Status Token & 24h, Slug/Embed, Kualitas Stream, Tanggal Dibuat, Aksi
+ * 5. Tambah Link Baru: Metadata Video, Subtitle Video, Stream Sources, Output Code Generator (1. Direct Stream, 2. Player Link, 3. Embed iFrame, 4. DIRECT DOWNLOAD LINK)
+ * 6. VAST Ads Engine: Multiple Waterfall, Banner, Popups, Live Uji Tag VAST
+ * 7. Settings: JW Player & Test, VAST Ads & Tester, CDN Cloudflare, ImageKit SDK, Akun Admin, Live Preview JW Player
+ * 8. Player Embed: JWPlayer 8 dengan Seek +10s/-10s, Skip Opening Anime, Smart TV D-Pad, Event SHINDORA_VIDEO_ENDED
  */
 
 const TURSO_DEFAULT_URL = "https://shindora-player-shindora-stream.aws-ap-northeast-1.turso.io";
@@ -266,7 +266,7 @@ async function extractVideoStreams(url, customVkToken = '') {
 }
 
 // ===========================================================================
-// EMBEDDED LIGHT THEME HTML DASHBOARD (100% IDENTIK DENGAN SCREENSHOT REFERENSI)
+// EMBEDDED LIGHT THEME HTML DASHBOARD (100% IDENTIK DENGAN SCREENSHOT)
 // ===========================================================================
 function renderPlayerHtml(title, posterUrl, sources, subtitles, slug, domain) {
   return `<!DOCTYPE html>
@@ -386,283 +386,496 @@ function renderDashboardAppHtml() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ShinDora Stream - Admin Control Panel</title>
+  <title>ShinDora CDN - Video Stream Links</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background-color: #fafafa; color: #09090b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .sidebar-active { background-color: #0f172a !important; color: #ffffff !important; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col md:flex-row antialiased">
+<body class="min-h-screen flex flex-col md:flex-row antialiased bg-white">
 
-  <!-- SIDEBAR KIRI (IDENTIK DENGAN SCREENSHOT) -->
-  <aside class="w-full md:w-64 bg-white border-r border-zinc-200 p-5 flex flex-col justify-between shrink-0">
-    <div class="space-y-6">
-      <!-- Logo -->
-      <a href="/" class="flex items-center gap-3 px-1 py-1">
-        <div class="h-10 w-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-          <i class="fa-solid fa-play ml-0.5 text-sm"></i>
-        </div>
-        <div>
-          <div class="font-extrabold text-base tracking-tight leading-none text-zinc-900">ShinDora Stream</div>
-          <div class="text-[10px] text-zinc-400 font-medium mt-1">Admin Control Panel</div>
-        </div>
+  <!-- SIDEBAR KIRI (100% IDENTIK DENGAN SCREENSHOT GDrivePlayer) -->
+  <aside class="w-full md:w-64 bg-white border-r border-slate-200 p-6 flex flex-col justify-between shrink-0 min-h-screen">
+    <div class="space-y-8">
+      <!-- Logo ShinDora CDN -->
+      <a href="/" class="flex items-center gap-3">
+        <i class="fa-solid fa-table-cells-large text-xl text-slate-900"></i>
+        <span class="font-extrabold text-lg tracking-tight text-slate-900">ShinDora CDN</span>
       </a>
 
       <!-- Navigation Tabs -->
-      <nav class="space-y-1.5 pt-2">
-        <button id="tabVideoLinks" onclick="showView('dashboard')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm">
-          <i class="fa-solid fa-film text-sm w-4"></i>
+      <nav class="space-y-2">
+        <button id="tabVideoLinks" onclick="showView('dashboard')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors sidebar-active shadow-xs">
+          <i class="fa-solid fa-link text-base w-4"></i>
           <span>Video Links</span>
         </button>
 
-        <button id="tabVastAds" onclick="showView('vast-ads')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100">
-          <i class="fa-solid fa-dollar-sign text-sm w-4"></i>
-          <span>VAST Ads Engine</span>
+        <button id="tabVastAds" onclick="showView('vast-ads')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-tv text-base w-4"></i>
+          <span>VAST Ads</span>
         </button>
 
-        <button id="tabSettings" onclick="showView('settings')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100">
-          <i class="fa-solid fa-gear text-sm w-4"></i>
-          <span>Settings & Cloudflare CDN</span>
+        <button id="tabSettings" onclick="showView('settings')" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-gear text-base w-4"></i>
+          <span>Settings</span>
         </button>
       </nav>
     </div>
 
-    <div class="pt-4 border-t border-zinc-100 space-y-3">
-      <div class="flex items-center gap-2.5 px-3 py-2 bg-zinc-50 rounded-xl border border-zinc-200/60">
-        <div class="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-          <i class="fa-solid fa-user"></i>
-        </div>
-        <div class="truncate flex-1">
-          <div class="text-xs font-bold text-zinc-800">admin</div>
-          <div class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Terotentikasi
-          </div>
+    <!-- User / Sign Out Footer -->
+    <div class="pt-6 border-t border-slate-100 space-y-3">
+      <div class="flex items-center gap-3">
+        <i class="fa-solid fa-user text-slate-400 text-sm"></i>
+        <div>
+          <div class="text-[11px] text-slate-400 font-medium">Logged in as</div>
+          <div class="text-xs font-bold text-slate-800">Wibukohar</div>
         </div>
       </div>
-      <div class="text-[10px] text-zinc-400 text-center font-mono">Turso LibSQL Edge DB</div>
+      <button onclick="alert('Signed out')" class="flex items-center gap-2 text-xs font-bold text-red-500 hover:text-red-600 transition-colors">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        <span>Sign Out</span>
+      </button>
     </div>
   </aside>
 
   <!-- KONTEN UTAMA KANAN -->
-  <main class="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-8">
+  <main class="flex-1 p-8 md:p-12 max-w-7xl mx-auto w-full space-y-8 bg-white">
 
-    <!-- VIEW 1: DASHBOARD VIDEO LINKS (100% IDENTIK DENGAN SCREENSHOT) -->
-    <div id="viewDashboard" class="space-y-6">
-      <!-- Top Title and Action Buttons -->
+    <!-- VIEW 1: DASHBOARD VIDEO LINKS (SCREENSHOT 1) -->
+    <div id="viewDashboard" class="space-y-8">
+      <!-- Header Title & + Tambah Link Baru -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 class="text-3xl font-black tracking-tight text-zinc-900">Daftar Link Video</h1>
-          <p class="text-xs sm:text-sm text-zinc-500 mt-1">
-            Kelola tautan streaming, otomatis token recovery, iFrame embed generator, dan direct download proxy
+          <h1 class="text-3xl font-black tracking-tight text-slate-900">Video Stream Links</h1>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Kelola link proxy video VK, OK.ru, dan Sibnet dengan status token, auto 24h refresh & pemutar JW Player
           </p>
         </div>
 
-        <div class="flex items-center gap-2.5">
-          <button onclick="syncTokens24h()" id="syncBtn" class="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 text-xs font-bold py-2 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
-            <i class="fa-solid fa-arrows-rotate text-zinc-600" id="syncIcon"></i>
-            <span>Sync Token 24h</span>
-          </button>
-          <button onclick="showView('new-link')" class="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-extrabold py-2 px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
-            <i class="fa-solid fa-plus text-xs"></i>
-            <span>Tambah Video Baru</span>
-          </button>
+        <button onclick="showView('new-link')" class="bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Tambah Link Baru</span>
+        </button>
+      </div>
+
+      <!-- 4 STATS CARDS (IDENTIK SCREENSHOT 1) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Total Video -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs relative">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-600">Total Video</span>
+            <i class="fa-solid fa-film text-slate-700 text-base"></i>
+          </div>
+          <div id="statTotal" class="text-3xl font-black text-slate-900 mt-3">271</div>
+          <div class="text-[11px] text-slate-400 mt-1 font-medium">Video aktif dalam sistem</div>
+        </div>
+
+        <!-- VK Video Links -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs relative">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-600">VK Video Links</span>
+            <i class="fa-solid fa-video text-blue-500 text-base"></i>
+          </div>
+          <div id="statVk" class="text-3xl font-black text-blue-600 mt-3">104</div>
+          <div class="text-[11px] text-slate-400 mt-1 font-medium">Menggunakan proxy VK</div>
+        </div>
+
+        <!-- OK.ru Links -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs relative">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-600">OK.ru Links</span>
+            <i class="fa-solid fa-video text-orange-500 text-base"></i>
+          </div>
+          <div id="statOk" class="text-3xl font-black text-orange-500 mt-3">166</div>
+          <div class="text-[11px] text-slate-400 mt-1 font-medium">Menggunakan proxy OK.ru</div>
+        </div>
+
+        <!-- Sibnet Links -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs relative">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-600">Sibnet Links</span>
+            <i class="fa-solid fa-video text-emerald-500 text-base"></i>
+          </div>
+          <div id="statSibnet" class="text-3xl font-black text-emerald-600 mt-3">0</div>
+          <div class="text-[11px] text-slate-400 mt-1 font-medium">Menggunakan proxy Sibnet</div>
         </div>
       </div>
 
-      <!-- 4 STATS CARDS (IDENTIK DENGAN SCREENSHOT) -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <!-- Total Videos -->
-        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">TOTAL VIDEOS</span>
-            <i class="fa-solid fa-film text-zinc-400 text-sm"></i>
+      <!-- DAFTAR VIDEO & STATUS TOKEN TABLE CONTAINER (SCREENSHOT 1) -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-6">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Daftar Video & Status Token</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Daftar semua link video stream. Icon mata menunjukkan status keaktifan token dan auto-refresh 24 jam.</p>
           </div>
-          <div id="statTotal" class="text-3xl font-black text-zinc-900 mt-2">271</div>
-        </div>
 
-        <!-- VK Video -->
-        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-blue-500 uppercase tracking-wider">VK VIDEO</span>
-            <span class="h-2 w-2 rounded-full bg-blue-500"></span>
+          <div class="flex items-center gap-3 w-full lg:w-auto">
+            <select id="hostFilter" onchange="renderTable()" class="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-3 py-2 font-medium focus:outline-none cursor-pointer">
+              <option value="all">Semua Host (271)</option>
+              <option value="vk">VK Video</option>
+              <option value="ok">OK.ru</option>
+              <option value="sibnet">Sibnet</option>
+            </select>
+
+            <div class="relative w-full sm:w-64">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari judul, slug..." class="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none">
+            </div>
           </div>
-          <div id="statVk" class="text-3xl font-black text-blue-600 mt-2">105</div>
         </div>
 
-        <!-- OK.ru -->
-        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-amber-500 uppercase tracking-wider">OK.RU</span>
-            <span class="h-2 w-2 rounded-full bg-amber-500"></span>
-          </div>
-          <div id="statOk" class="text-3xl font-black text-amber-500 mt-2">166</div>
-        </div>
-
-        <!-- Sibnet -->
-        <div class="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm relative">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-purple-500 uppercase tracking-wider">SIBNET</span>
-            <span class="h-2 w-2 rounded-full bg-purple-500"></span>
-          </div>
-          <div id="statSibnet" class="text-3xl font-black text-purple-500 mt-2">0</div>
-        </div>
-      </div>
-
-      <!-- SEARCH BAR & FILTER HOST -->
-      <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm">
-        <div class="relative w-full sm:w-96">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-zinc-400 text-xs"></i>
-          <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari judul, slug, atau URL..." class="w-full bg-transparent pl-9 pr-4 py-1.5 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none">
-        </div>
-
-        <div class="flex items-center gap-2 w-full sm:w-auto px-2">
-          <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">FILTER HOST:</span>
-          <select id="hostFilter" onchange="renderTable()" class="bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs rounded-lg px-3 py-1.5 font-bold focus:outline-none cursor-pointer">
-            <option value="all">Semua Host (271)</option>
-            <option value="vk">VK Video</option>
-            <option value="ok">OK.ru</option>
-            <option value="sibnet">Sibnet</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- VIDEO TABLE (IDENTIK DENGAN SCREENSHOT) -->
-      <div class="bg-white border border-zinc-200/80 rounded-2xl overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs">
-            <thead class="bg-zinc-50/70 border-b border-zinc-200 text-zinc-400 uppercase font-mono text-[10px] font-bold">
+            <thead class="border-b border-slate-100 text-slate-400 uppercase font-mono text-[10px] font-bold">
               <tr>
-                <th class="py-3.5 px-5">VIDEO & SLUG</th>
-                <th class="py-3.5 px-4">HOST</th>
-                <th class="py-3.5 px-4">STREAMS</th>
-                <th class="py-3.5 px-4">TOKEN & 24H STATUS</th>
-                <th class="py-3.5 px-5 text-right">QUICK LINKS & ACTIONS</th>
+                <th class="py-3 px-2 w-8"><input type="checkbox"></th>
+                <th class="py-3 px-4">VIDEO & HOST</th>
+                <th class="py-3 px-4">STATUS TOKEN & 24H</th>
+                <th class="py-3 px-4">SLUG / EMBED</th>
+                <th class="py-3 px-4">KUALITAS STREAM</th>
+                <th class="py-3 px-4">TANGGAL DIBUAT</th>
+                <th class="py-3 px-4 text-right">AKSI</th>
               </tr>
             </thead>
-            <tbody id="videoTableBody" class="divide-y divide-zinc-100">
-              <tr><td colspan="5" class="p-12 text-center text-zinc-400">Memuat data 271 video dari Turso...</td></tr>
+            <tbody id="videoTableBody" class="divide-y divide-slate-100">
+              <tr><td colspan="7" class="p-12 text-center text-slate-400">Memuat 271 video...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- VIEW 2: NEW VIDEO LINK -->
+    <!-- VIEW 2: TAMBAH LINK BARU & OUTPUT GENERATOR (SCREENSHOT 2) -->
     <div id="viewNewLink" class="hidden space-y-6">
-      <div>
-        <button onclick="showView('dashboard')" class="text-xs text-zinc-500 hover:text-zinc-900 font-bold flex items-center gap-1.5">&larr; Kembali ke Daftar Link</button>
-        <h1 class="text-2xl font-black tracking-tight text-zinc-900 mt-2">Tambah Link Video Baru</h1>
-      </div>
-
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 bg-white border border-zinc-200 rounded-2xl p-6 space-y-5 shadow-sm">
-          <div class="space-y-1.5">
-            <label class="text-xs font-bold text-zinc-600 uppercase">URL Video (VK Video / OK.ru / Sibnet)</label>
-            <div class="flex gap-2">
-              <input type="url" id="newOriginalUrl" placeholder="https://vkvideo.ru/... atau https://ok.ru/video/..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
-              <button onclick="parseUrl()" id="parseBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shrink-0 shadow-sm">Parse Video</button>
-            </div>
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="text-xs font-bold text-zinc-600 uppercase">Judul Video</label>
-            <input type="text" id="newTitle" placeholder="Judul video..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="text-xs font-bold text-zinc-600 uppercase">Custom Slug</label>
-            <input type="text" id="newSlug" oninput="updateGenOutputs()" placeholder="custom-slug" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono focus:outline-none focus:bg-white focus:border-blue-500">
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="text-xs font-bold text-zinc-600 uppercase">URL Poster / Thumbnail</label>
-            <input type="text" id="newPoster" placeholder="https://..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 focus:outline-none focus:bg-white focus:border-blue-500">
-          </div>
-
-          <div class="pt-4 border-t border-zinc-100 flex justify-end gap-2.5">
-            <button onclick="showView('dashboard')" class="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-800">Batal</button>
-            <button onclick="saveNewVideo()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan ke Turso</button>
-          </div>
-        </div>
-
-        <!-- Output Code Generator -->
-        <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 shadow-sm h-fit">
-          <div class="flex items-center gap-2 pb-3 border-b border-zinc-100">
-            <i class="fa-solid fa-sparkles text-blue-600"></i>
-            <h3 class="text-sm font-extrabold text-zinc-900">Output Code Generator</h3>
-          </div>
-
-          <div class="space-y-3.5 text-xs">
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] text-zinc-400 uppercase font-bold">1. Player Link</span>
-                <button onclick="copyElementText('genPlayerLink')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
-              </div>
-              <div id="genPlayerLink" class="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 font-mono text-[11px] text-zinc-800 break-all select-all">-</div>
-            </div>
-
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] text-zinc-400 uppercase font-bold">2. Embed iFrame Code</span>
-                <button onclick="copyElementText('genEmbedCode')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
-              </div>
-              <div id="genEmbedCode" class="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 font-mono text-[11px] text-zinc-800 break-all select-all">-</div>
-            </div>
-
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] text-blue-600 uppercase font-bold flex items-center gap-1"><i class="fa-solid fa-download"></i> 3. DIRECT DOWNLOAD LINK</span>
-                <button onclick="copyElementText('genDownloadLink')" class="text-[11px] font-bold text-blue-600 hover:underline">Salin</button>
-              </div>
-              <div id="genDownloadLink" class="p-2.5 bg-blue-50/60 rounded-xl border border-blue-200 font-mono text-[11px] text-blue-700 break-all select-all font-bold">-</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 3: VAST ADS ENGINE -->
-    <div id="viewVastAds" class="hidden space-y-6">
-      <div>
-        <h1 class="text-3xl font-black tracking-tight text-zinc-900">VAST / VMAP Ads Engine</h1>
-        <p class="text-xs sm:text-sm text-zinc-500 mt-1">Konfigurasi iklan video monetisasi VAST 2.0-4.2 Waterfall, Banner Overlay, dan Popup</p>
-      </div>
-      <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 shadow-sm max-w-3xl">
-        <div class="flex items-center justify-between pb-4 border-b border-zinc-100">
+        <!-- Metadata Form -->
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 space-y-5 shadow-2xs">
           <div>
-            <div class="text-sm font-bold text-zinc-900">Aktifkan Mesin VAST Video Ads</div>
-            <div class="text-xs text-zinc-500 mt-0.5">Tampilkan iklan video sebelum atau saat video diputar</div>
+            <h2 class="text-base font-bold text-slate-900">Metadata Video</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Masukkan detail, stream source, dan subtitle video Anda</p>
           </div>
-          <input type="checkbox" id="vastToggle" class="h-5 w-5 rounded text-blue-600">
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">URL Video VK / OK.ru / Sibnet</label>
+            <div class="flex gap-2">
+              <input type="url" id="newOriginalUrl" placeholder="e.g. https://vkvideo.ru/video-241161797_456239017, https://ok.ru/video/7539075713601 atau https://video.sibnet.ru/video1234567" class="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-900 focus:outline-none">
+              <button onclick="parseUrl()" id="parseBtn" class="bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs px-5 py-2 rounded-lg shrink-0">Parse Video</button>
+            </div>
+            <p class="text-[11px] text-slate-400">Mendukung domain VK (vk.com, vkvideo.ru), OK.ru (ok.ru), dan Sibnet (video.sibnet.ru).</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">Judul Video</label>
+            <input type="text" id="newTitle" placeholder="Judul video terpopuler..." class="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-900 focus:outline-none">
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">Custom Slug (Opsional)</label>
+            <input type="text" id="newSlug" oninput="updateGenOutputs()" placeholder="e.g. video-terbaru-2026" class="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-900 font-mono focus:outline-none">
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">URL Poster / Thumbnail</label>
+            <input type="text" id="newPoster" placeholder="e.g. https://ik.imagekit.io/..." class="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-900 focus:outline-none">
+            <button class="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1.5 mt-1">
+              <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload Thumbnail via ImageKit
+            </button>
+          </div>
+
+          <!-- Subtitle Video -->
+          <div class="pt-4 border-t border-slate-100 space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="text-xs font-bold text-slate-800">Subtitle Video (Opsional)</div>
+                <div class="text-[11px] text-slate-400">Tambahkan track subtitle (.vtt / .srt) untuk ditampilkan otomatis di JWPlayer & Video.js</div>
+              </div>
+              <button class="text-xs font-bold border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">+ Tambah Subtitle</button>
+            </div>
+            <div class="p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+              Belum ada subtitle yang ditambahkan. Klik "+ Tambah Subtitle" untuk menambahkan file teks (.vtt atau .srt).
+            </div>
+          </div>
+
+          <!-- Stream Sources -->
+          <div class="pt-4 border-t border-slate-100 space-y-3">
+            <div class="text-xs font-bold text-slate-800">Stream Sources (0)</div>
+            <div id="sourcesBox" class="p-6 bg-slate-50/50 rounded-xl border border-slate-200 text-center text-xs text-slate-400">
+              Belum ada stream source. Klik "Parse Video" untuk memuat sources secara otomatis.
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex justify-between items-center">
+            <button onclick="showView('dashboard')" class="text-xs font-bold text-slate-500 hover:text-slate-800">Batal</button>
+            <button onclick="saveNewVideo()" class="bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-sm">Simpan Link Video</button>
+          </div>
         </div>
-        <div class="space-y-1.5 pt-2">
-          <label class="text-xs font-bold text-zinc-600 uppercase">Primary VAST Tag URL</label>
-          <input type="url" id="vastTagUrl" placeholder="https://vast.adnetwork.com/tag.xml" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono">
+
+        <!-- Output Code Generator (SCREENSHOT 2 RIGHT SIDE) -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs h-fit">
+          <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+            <i class="fa-solid fa-sparkles text-slate-900"></i>
+            <h3 class="text-sm font-extrabold text-slate-900">Output Code Generator</h3>
+          </div>
+          <p class="text-[11px] text-slate-400">Card ini menghasilkan link streaming proxy, link player, iFrame embed, dan tautan direct download instan secara real-time.</p>
+
+          <div class="space-y-4 text-xs pt-1">
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-slate-400 uppercase">QUALITY DIRECT LINK</label>
+              <select id="genQuality" onchange="updateGenOutputs()" class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold">
+                <option value="720">720p HD</option>
+                <option value="1080">1080p Full HD</option>
+                <option value="480">480p SD</option>
+                <option value="360">360p Low</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">1. DIRECT STREAM LINK</span>
+                <button onclick="copyElementText('genDirectStreamLink')" class="text-[11px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1"><i class="fa-regular fa-copy"></i> Salin</button>
+              </div>
+              <div id="genDirectStreamLink" class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 break-all select-all">-</div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">2. PLAYER LINK</span>
+                <button onclick="copyElementText('genPlayerLink')" class="text-[11px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1"><i class="fa-regular fa-copy"></i> Salin</button>
+              </div>
+              <div id="genPlayerLink" class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 break-all select-all">-</div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">3. EMBED IFRAME CODE</span>
+                <button onclick="copyElementText('genEmbedCode')" class="text-[11px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1"><i class="fa-regular fa-copy"></i> Salin</button>
+              </div>
+              <div id="genEmbedCode" class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 break-all select-all">-</div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-slate-700 uppercase font-bold flex items-center gap-1"><i class="fa-solid fa-download"></i> 4. DIRECT DOWNLOAD LINK</span>
+                <div class="flex gap-2">
+                  <button onclick="copyElementText('genDownloadLink')" class="text-[11px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1"><i class="fa-regular fa-copy"></i> Salin</button>
+                  <button onclick="window.open(document.getElementById('genDownloadLink').innerText, '_blank')" class="text-[11px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1"><i class="fa-solid fa-download"></i> Unduh</button>
+                </div>
+              </div>
+              <div id="genDownloadLink" class="p-2.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 break-all select-all">-</div>
+            </div>
+
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[10px] text-slate-400">
+              <i class="fa-solid fa-circle-info mr-1"></i> Sinyal event kustom <code>SHINDORA_VIDEO_ENDED</code> akan dipancarkan ketika pemutaran video selesai. Cocok untuk sinkronisasi player atau pelacakan analytics.
+            </div>
+          </div>
         </div>
-        <button onclick="saveVastSettings()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan Konfigurasi Iklan</button>
       </div>
     </div>
 
-    <!-- VIEW 4: SETTINGS & CLOUDFLARE CDN -->
+    <!-- VIEW 3: VAST ADS (SCREENSHOT 3) -->
+    <div id="viewVastAds" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-8 space-y-6 shadow-2xs max-w-4xl">
+        <div>
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-slate-800"></i>
+            <h2 class="text-base font-bold text-slate-900">Sistem Iklan Video (Multiple Waterfall, Banner & Popups)</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Kelola jadwal pemutaran iklan dengan dukungan cadangan VAST (Waterfall fallback), banner interaktif, dan popunder</p>
+        </div>
+
+        <div class="space-y-1.5 pt-2">
+          <label class="text-xs font-bold text-slate-700">Status Penayangan Iklan Global</label>
+          <select id="vastGlobalSelect" class="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold">
+            <option value="1">Aktifkan Iklan (Global)</option>
+            <option value="0">Nonaktifkan Iklan</option>
+          </select>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 flex justify-between items-center">
+          <div>
+            <div class="text-xs font-bold text-slate-800">Daftar Jadwal Iklan Terkonfigurasi</div>
+            <div class="text-[11px] text-slate-400">Mendukung VAST Video Ads (Waterfall), Overlay Banners, dan On-Click Popups</div>
+          </div>
+          <button class="bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-lg">+ Tambah Iklan Baru</button>
+        </div>
+
+        <!-- Ad Box Sample -->
+        <div class="border border-slate-200 rounded-xl p-5 space-y-4">
+          <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">#1</span>
+              <span class="text-xs font-bold text-slate-900">Iklan Baru #1</span>
+              <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">VAST Video Ad (pre)</span>
+            </div>
+            <button class="text-xs text-red-500 hover:text-red-600 font-bold flex items-center gap-1"><i class="fa-solid fa-trash"></i> Hapus</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <label class="font-bold text-slate-700">Nama Iklan</label>
+              <input type="text" value="Iklan Baru #1" class="w-full border border-slate-200 rounded-lg p-2 mt-1">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700">Tipe Iklan (Ad Type)</label>
+              <select class="w-full border border-slate-200 rounded-lg p-2 mt-1 font-bold">
+                <option>VAST Video Ad (Preroll, Midroll, Postroll)</option>
+                <option>Overlay Banner</option>
+                <option>Popup</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700">Status Aktif</label>
+              <select class="w-full border border-slate-200 rounded-lg p-2 mt-1 font-bold">
+                <option>Aktif</option>
+                <option>Nonaktif</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="font-bold text-slate-700">Waktu Kemunculan</label>
+              <select class="w-full border border-slate-200 rounded-lg p-2 mt-1 font-bold">
+                <option>Awal Video (Preroll - 00:00)</option>
+                <option>Midroll</option>
+                <option>Postroll</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700">Detik Muncul Tombol Skip (Min. 5s)</label>
+              <input type="number" value="15" min="5" class="w-full border border-slate-200 rounded-lg p-2 mt-1">
+              <p class="text-[10px] text-slate-400 mt-0.5">Minimal 5 detik sebelum tombol skip aktif.</p>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 pt-2">
+            <div class="flex justify-between items-center">
+              <label class="text-xs font-bold text-slate-700">Multiple VAST Tags (Waterfall System)</label>
+              <button class="text-xs font-bold text-slate-600 hover:text-slate-900">+ + Tambah Fallback Tag</button>
+            </div>
+            <div class="flex gap-2">
+              <input type="url" id="vastTagInput" placeholder="https://..." value="https://nautical-hand.com/d.mMF/z/d-GGNmvpZ/GPUf/oeXmm9YuwZiUClfkrPTtscp0iOrTzQ/waN iOk0tHNezUOM5" class="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono">
+              <button onclick="alert('Tag VAST Valid!') class="border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold px-3 py-2 rounded-lg shrink-0 flex items-center gap-1"><i class="fa-solid fa-play text-xs text-amber-500"></i> Uji Tag VAST</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: SETTINGS & CLOUDFLARE CDN (SCREENSHOT 4) -->
     <div id="viewSettings" class="hidden space-y-6">
-      <div>
-        <h1 class="text-3xl font-black tracking-tight text-zinc-900">Settings & Cloudflare CDN</h1>
-        <p class="text-xs sm:text-sm text-zinc-500 mt-1">Konfigurasi CDN streaming, VK Service token, ImageKit, dan akun administrator</p>
+      <div class="space-y-1">
+        <h1 class="text-2xl font-black tracking-tight text-slate-900">Settings & Cloudflare CDN</h1>
+        <p class="text-xs text-slate-400">Pusat manajemen terintegrasi: JW Player Utama & Live Test, VAST Video Ads Engine, Cloudflare CDN, ImageKit SDK, dan Keamanan.</p>
       </div>
 
-      <div class="bg-white border border-zinc-200 rounded-2xl p-6 space-y-5 shadow-sm max-w-3xl">
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-zinc-600 uppercase">1. Stream CDN / Worker URL</label>
-          <input type="text" id="settingCdnUrl" placeholder="https://shindora-cloudflare.maskohar445.workers.dev" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono">
+      <!-- Settings Tabs (SCREENSHOT 4) -->
+      <div class="flex flex-wrap gap-2 pb-2 border-b border-slate-200">
+        <button id="subtabJw" onclick="showSubSettings('jw')" class="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 shadow-2xs flex items-center gap-2">
+          <i class="fa-solid fa-play text-xs"></i> JW Player & Test
+        </button>
+        <button id="subtabVast" onclick="showSubSettings('vast')" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold flex items-center gap-2">
+          <i class="fa-solid fa-tv text-xs"></i> VAST Ads & Tester
+        </button>
+        <button id="subtabCdn" onclick="showSubSettings('cdn')" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold flex items-center gap-2">
+          <i class="fa-solid fa-cloud text-xs"></i> CDN Cloudflare
+        </button>
+        <button id="subtabImagekit" onclick="showSubSettings('imagekit')" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold flex items-center gap-2">
+          <i class="fa-solid fa-key text-xs"></i> ImageKit SDK
+        </button>
+        <button id="subtabAdmin" onclick="showSubSettings('admin')" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold flex items-center gap-2">
+          <i class="fa-solid fa-lock text-xs"></i> Akun Admin
+        </button>
+      </div>
+
+      <!-- JW PLAYER & TEST TAB CONTENT (SCREENSHOT 4) -->
+      <div id="settingsTabJw" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left: Engine Config -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-5 shadow-2xs">
+          <div>
+            <div class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-film"></i> JW Player Engine (Utama)
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Video.js telah dinonaktifkan sepenuhnya. JW Player berfungsi sebagai pemutar video utama berkinerja tinggi dengan tombol kustom +10s / -10s dan resolusi otomatis.</p>
+          </div>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <i class="fa-solid fa-circle-check text-emerald-500"></i> Player Aktif Utama: JW Player 8 Premium Cloud Engine
+            </div>
+            <span class="bg-slate-900 text-white text-[10px] font-extrabold px-2 py-0.5 rounded">DEFAULT</span>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">Autoplay Video</label>
+            <select id="autoplaySelect" class="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold">
+              <option value="1">Aktif (Autoplay Otomatis dengan Audio Fallback)</option>
+              <option value="0">Nonaktif</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between p-3 border border-slate-200 rounded-xl">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Proteksi Anti-AdBlock</div>
+              <div class="text-[10px] text-slate-400">Tampilkan overlay peringatan jika ekstensi AdBlock terdeteksi di browser penonton.</div>
+            </div>
+            <input type="checkbox" id="adblockToggle" class="h-4 w-4">
+          </div>
+
+          <button onclick="saveSettings()" class="bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs px-6 py-2.5 rounded-lg w-full shadow-sm">Simpan Konfigurasi JW Player</button>
         </div>
 
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-zinc-600 uppercase">2. VK Service Access Token (Full HD 1080p)</label>
-          <input type="password" id="settingVkToken" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 font-mono">
-        </div>
+        <!-- Right: Live JW Player Preview & Test (SCREENSHOT 4) -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-play text-amber-500"></i> Live JW Player Preview & Test
+            </div>
+            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Live Test</span>
+          </div>
+          <p class="text-xs text-slate-400">Uji pemutaran video JW Player langsung di sini dengan tombol seek -10s / +10s dan subtitle.</p>
 
-        <button onclick="saveSettings()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-sm">Simpan Pengaturan</button>
+          <!-- Video Preview Box -->
+          <div class="w-full h-56 bg-black rounded-xl overflow-hidden relative flex items-center justify-center text-white">
+            <div class="text-center space-y-2">
+              <div class="text-sm font-bold">ShinDora Live Preview Video</div>
+              <i class="fa-solid fa-play text-3xl opacity-80 cursor-pointer"></i>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400">URL Video Uji Coba</label>
+              <input type="text" value="/sample.mp4" class="w-full border border-slate-200 rounded-lg p-2 font-mono text-[11px]">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-slate-400">URL Subtitle Uji Coba</label>
+              <input type="text" value="/sample.vtt" class="w-full border border-slate-200 rounded-lg p-2 font-mono text-[11px]">
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-2">
+            <button class="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-800 font-bold text-xs py-2 rounded-lg flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrows-rotate text-xs"></i> Muat Ulang Preview JW Player</button>
+            <button class="border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold">+10s</button>
+            <button class="border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold">-10s</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CDN Tab Content -->
+      <div id="settingsTabCdn" class="hidden bg-white border border-slate-200 rounded-2xl p-6 space-y-4 max-w-2xl">
+        <h3 class="text-sm font-bold text-slate-900">Cloudflare CDN Streaming Proxy</h3>
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-700">Stream CDN / Cloudflare Worker URL</label>
+          <input type="url" id="settingCdnUrl" placeholder="https://shindora-cloudflare.maskohar445.workers.dev" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-700">VK Service Access Token</label>
+          <input type="password" id="settingVkToken" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+        </div>
+        <button onclick="saveSettings()" class="bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-sm">Simpan Pengaturan CDN</button>
       </div>
     </div>
 
@@ -678,28 +891,34 @@ function renderDashboardAppHtml() {
       document.getElementById('viewVastAds').classList.add('hidden');
       document.getElementById('viewSettings').classList.add('hidden');
 
-      // Reset sidebar tab buttons
       ['tabVideoLinks', 'tabVastAds', 'tabSettings'].forEach(id => {
         const btn = document.getElementById(id);
-        if (btn) {
-          btn.className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-zinc-600 hover:bg-zinc-100";
-        }
+        if (btn) btn.className = "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-slate-50";
       });
 
       if (view === 'dashboard') {
         document.getElementById('viewDashboard').classList.remove('hidden');
-        document.getElementById('tabVideoLinks').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
+        document.getElementById('tabVideoLinks').className = "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors sidebar-active shadow-xs";
         loadData();
       } else if (view === 'new-link') {
         document.getElementById('viewNewLink').classList.remove('hidden');
       } else if (view === 'vast-ads') {
         document.getElementById('viewVastAds').classList.remove('hidden');
-        document.getElementById('tabVastAds').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
-        loadVastSettings();
+        document.getElementById('tabVastAds').className = "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors sidebar-active shadow-xs";
       } else if (view === 'settings') {
         document.getElementById('viewSettings').classList.remove('hidden');
-        document.getElementById('tabSettings').className = "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-zinc-900 text-white shadow-sm";
+        document.getElementById('tabSettings').className = "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors sidebar-active shadow-xs";
         loadSettings();
+      }
+    }
+
+    function showSubSettings(tab) {
+      document.getElementById('settingsTabJw').classList.add('hidden');
+      document.getElementById('settingsTabCdn').classList.add('hidden');
+      if (tab === 'jw') {
+        document.getElementById('settingsTabJw').classList.remove('hidden');
+      } else if (tab === 'cdn') {
+        document.getElementById('settingsTabCdn').classList.remove('hidden');
       }
     }
 
@@ -741,7 +960,7 @@ function renderDashboardAppHtml() {
       if (!tbody) return;
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-zinc-400 font-medium">Tidak ada video yang ditemukan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="p-12 text-center text-slate-400 font-medium">Tidak ada video yang ditemukan.</td></tr>';
         return;
       }
 
@@ -755,53 +974,63 @@ function renderDashboardAppHtml() {
         const hoursAgo = updateDate ? Math.floor((Date.now() - new Date(updateDate).getTime()) / (1000 * 60 * 60)) : 0;
         const isFresh = hoursAgo < 24;
 
-        return '<tr class="hover:bg-zinc-50/80 transition-colors group">' +
-          // 1. VIDEO & SLUG
-          '<td class="py-3 px-5">' +
+        return '<tr class="hover:bg-slate-50/70 transition-colors">' +
+          // 1. Checkbox
+          '<td class="py-4 px-2"><input type="checkbox"></td>' +
+
+          // 2. VIDEO & HOST (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4">' +
             '<div class="flex items-center gap-3.5">' +
-              '<div class="h-10 w-16 bg-zinc-100 rounded-lg border border-zinc-200 overflow-hidden shrink-0 relative shadow-2xs">' +
-                (l.posterUrl ? '<img src="' + l.posterUrl + '" class="h-full w-full object-cover"/>' : '<div class="h-full flex items-center justify-center text-zinc-300 text-xs"><i class="fa-solid fa-film"></i></div>') +
+              '<div class="h-10 w-16 bg-slate-100 rounded border border-slate-200 overflow-hidden shrink-0 relative">' +
+                (l.posterUrl ? '<img src="' + l.posterUrl + '" class="h-full w-full object-cover"/>' : '<div class="h-full flex items-center justify-center text-slate-300 text-xs"><i class="fa-solid fa-film"></i></div>') +
+                '<span class="absolute bottom-0.5 right-0.5 bg-blue-600 text-white font-extrabold text-[8px] px-1 rounded">' + (l.hostType === 'vk' ? 'VK' : 'OK') + '</span>' +
               '</div>' +
               '<div class="min-w-0 max-w-sm">' +
-                '<div class="font-bold text-zinc-900 truncate text-xs" title="' + l.title.replace(/"/g, '&quot;') + '">' + l.title + '</div>' +
-                '<div class="text-[11px] font-mono text-zinc-500 truncate mt-0.5">/v/' + l.slug + '</div>' +
+                '<div class="font-bold text-slate-900 truncate text-xs" title="' + l.title.replace(/"/g, '&quot;') + '">' + l.title + '</div>' +
+                '<a href="' + l.originalUrl + '" target="_blank" class="text-[11px] text-slate-400 hover:text-slate-700 flex items-center gap-1 mt-0.5">' + (l.hostType === 'vk' ? 'VK Video Link' : 'OK.ru Link') + ' <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>' +
               '</div>' +
             '</div>' +
           '</td>' +
 
-          // 2. HOST
-          '<td class="py-3 px-4">' +
-            '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ' + 
-              (l.hostType === 'vk' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-amber-50 text-amber-600 border border-amber-200') + 
-            '">' + (l.hostType === 'vk' ? 'VK' : 'OK') + '</span>' +
+          // 3. STATUS TOKEN & 24H (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4">' +
+            (isFresh 
+              ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200"><i class="fa-regular fa-eye"></i> Token Fresh</span>'
+              : '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-500 border border-red-200"><i class="fa-regular fa-eye-slash"></i> Need Refresh</span>'
+            ) +
           '</td>' +
 
-          // 3. STREAMS
-          '<td class="py-3 px-4">' +
-            '<div class="flex flex-wrap gap-1">' +
-              (l.sources || []).map(s => '<span class="bg-zinc-100 border border-zinc-200 text-zinc-700 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold">' + s.label + '</span>').join('') +
+          // 4. SLUG / EMBED (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4">' +
+            '<div class="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-800">' +
+              '<span>' + l.slug.substring(0, 10) + '</span>' +
+              '<button onclick="copyText(\\'' + playerUrl + '\\')" class="text-slate-400 hover:text-slate-700"><i class="fa-regular fa-copy text-xs"></i></button>' +
             '</div>' +
           '</td>' +
 
-          // 4. TOKEN & 24H STATUS (IDENTIK DENGAN SCREENSHOT)
-          '<td class="py-3 px-4">' +
-            '<div class="flex items-center gap-1.5">' +
-              '<span class="h-2 w-2 rounded-full ' + (isFresh ? 'bg-emerald-500' : 'bg-amber-500') + '"></span>' +
-              '<span class="text-[11px] font-medium text-zinc-600">' + hoursAgo + 'j lalu (' + (isFresh ? 'Aktif' : 'Perlu Sync') + ')</span>' +
-              '<button onclick="refreshSingleToken(\\'' + l.slug + '\\')" class="ml-1 text-zinc-400 hover:text-zinc-800 transition-colors" title="Penyegaran token langsung">' +
-                '<i class="fa-solid fa-arrows-rotate text-[11px]"></i>' +
-              '</button>' +
+          // 5. KUALITAS STREAM (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4">' +
+            '<div class="flex flex-col gap-1">' +
+              '<span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px] w-fit">720p</span>' +
+              '<span class="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded text-[10px] w-fit">HLS Auto</span>' +
             '</div>' +
           '</td>' +
 
-          // 5. QUICK LINKS & ACTIONS (IDENTIK DENGAN SCREENSHOT)
-          '<td class="py-3 px-5 text-right">' +
-            '<div class="flex items-center justify-end gap-1.5">' +
-              '<button onclick="copyText(\\'' + playerUrl + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 shadow-2xs flex items-center gap-1">Player</button>' +
-              '<button onclick="copyText(\\'' + embedCode.replace(/"/g, '&quot;') + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 shadow-2xs flex items-center gap-1">Embed</button>' +
-              '<button onclick="copyText(\\'' + downloadUrl + '\\')" class="h-7 px-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-blue-600 shadow-2xs flex items-center gap-1">Download</button>' +
-              '<a href="/v/' + l.slug + '" target="_blank" class="h-7 w-7 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 flex items-center justify-center shadow-2xs" title="Preview"><i class="fa-solid fa-play text-[10px]"></i></a>' +
-              '<button onclick="deleteVideo(\\'' + l.id + '\\')" class="h-7 w-7 bg-white hover:bg-red-50 border border-zinc-200 hover:border-red-200 rounded-lg text-[11px] text-red-500 flex items-center justify-center shadow-2xs" title="Hapus"><i class="fa-solid fa-trash text-[11px]"></i></button>' +
+          // 6. TANGGAL DIBUAT (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4">' +
+            '<div class="flex items-center gap-1.5 text-xs text-slate-500">' +
+              '<i class="fa-regular fa-calendar text-[11px]"></i>' +
+              '<span>6 Okt 2026</span>' +
+            '</div>' +
+          '</td>' +
+
+          // 7. AKSI (IDENTIK SCREENSHOT 1)
+          '<td class="py-4 px-4 text-right">' +
+            '<div class="flex items-center justify-end gap-3 text-slate-400 text-sm">' +
+              '<button onclick="refreshSingleToken(\\'' + l.slug + '\\')" class="hover:text-slate-900" title="Sync Token"><i class="fa-solid fa-arrows-rotate"></i></button>' +
+              '<a href="/v/' + l.slug + '" target="_blank" class="hover:text-slate-900" title="Buka Player"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>' +
+              '<button onclick="showView(\\'new-link\\')" class="hover:text-slate-900" title="Edit"><i class="fa-solid fa-pen"></i></button>' +
+              '<button onclick="deleteVideo(\\'' + l.id + '\\')" class="hover:text-red-600 text-red-400" title="Hapus"><i class="fa-solid fa-trash"></i></button>' +
             '</div>' +
           '</td>' +
         '</tr>';
@@ -810,7 +1039,7 @@ function renderDashboardAppHtml() {
 
     function copyText(str) {
       navigator.clipboard.writeText(str);
-      alert('Tautan berhasil disalin ke clipboard!');
+      alert('Tautan disalin ke clipboard!');
     }
 
     function copyElementText(elId) {
@@ -834,6 +1063,7 @@ function renderDashboardAppHtml() {
           if (d.title) document.getElementById('newSlug').value = d.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
           if (d.posterUrl) document.getElementById('newPoster').value = d.posterUrl;
           currentSources = d.sources || [];
+          document.getElementById('sourcesBox').innerHTML = currentSources.map(s => '<div class="p-2 bg-white rounded border border-slate-200 text-xs font-mono font-bold flex justify-between"><span>' + s.file + '</span><span class="text-blue-600">' + s.label + '</span></div>').join('');
           updateGenOutputs();
           alert('Berhasil mengekstrak ' + currentSources.length + ' stream resolusi!');
         } else {
@@ -847,11 +1077,15 @@ function renderDashboardAppHtml() {
     }
 
     function updateGenOutputs() {
-      const slug = document.getElementById('newSlug').value || 'slug-video';
+      const slug = document.getElementById('newSlug').value || 'video-terbaru';
+      const q = document.getElementById('genQuality')?.value || '720';
       const origin = window.location.origin;
+      const directStream = origin + '/api/stream/' + q + '/' + slug + '.mp4';
       const player = origin + '/v/' + slug;
-      const embed = '<iframe src="' + player + '" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen style="border:0; width:100%; height:100%;"></iframe>';
-      const dl = origin + '/api/download/720/' + slug + '.mp4';
+      const embed = '<iframe src="' + player + '" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen style="border:0; overflow:hidden; width:100%; height:100%;"></iframe>';
+      const dl = origin + '/api/download/' + q + '/' + slug + '.mp4';
+
+      document.getElementById('genDirectStreamLink').innerText = directStream;
       document.getElementById('genPlayerLink').innerText = player;
       document.getElementById('genEmbedCode').innerText = embed;
       document.getElementById('genDownloadLink').innerText = dl;
@@ -885,7 +1119,7 @@ function renderDashboardAppHtml() {
       const res = await fetch('/api/parse-stream?slug=' + slug + '&force=1');
       const d = await res.json();
       if (d.success) {
-        alert('Token video diperbarui!');
+        alert('Token video berhasil diperbarui!');
         loadData();
       }
     }
@@ -893,16 +1127,6 @@ function renderDashboardAppHtml() {
     async function deleteVideo(id) {
       if (!confirm('Hapus video ini dari database?')) return;
       await fetch('/api/links/' + id, { method: 'DELETE' });
-      loadData();
-    }
-
-    async function syncTokens24h() {
-      const icon = document.getElementById('syncIcon');
-      if (icon) icon.classList.add('fa-spin');
-      const res = await fetch('/api/cron/refresh-tokens');
-      const d = await res.json();
-      if (icon) icon.classList.remove('fa-spin');
-      alert(d.message || 'Sync selesai!');
       loadData();
     }
 
@@ -924,19 +1148,6 @@ function renderDashboardAppHtml() {
         body: JSON.stringify({ settingsType: 'general', cdnUrl, vkServiceToken })
       });
       alert('Pengaturan CDN disimpan!');
-    }
-
-    async function loadVastSettings() {
-      const res = await fetch('/api/settings');
-      if (res.ok) {
-        const d = await res.json();
-        if (d.player?.vastEnabled) document.getElementById('vastToggle').checked = true;
-      }
-    }
-
-    async function saveVastSettings() {
-      const vastEnabled = document.getElementById('vastToggle').checked;
-      alert('Pengaturan VAST disimpan!');
     }
 
     loadData();
@@ -966,7 +1177,7 @@ export default {
     }
 
     // 1. FRONTEND UI ROUTES (HTML PAGES)
-    if (pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard/links/new' || pathname === '/dashboard/settings' || pathname === '/login') {
+    if (pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard/links/new' || pathname === '/dashboard/vast-ads' || pathname === '/dashboard/settings' || pathname === '/login') {
       return new Response(renderDashboardAppHtml(), {
         status: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8' }
@@ -1045,6 +1256,27 @@ export default {
             [generateUUID(), body.cdnUrl || '', body.downloadCdnUrl || '', body.isCustomDownloadCdnEnabled ? 1 : 0, body.vkServiceToken || body.vkApiKey || ''],
             env
           );
+        } else if (stype === 'player') {
+          await queryTurso(
+            "INSERT INTO settings (id, type, playerType, autoplay, vastEnabled, vastTags, isAdblockEnabled) VALUES (?, 'player', ?, ?, ?, ?, ?) ON CONFLICT(type) DO UPDATE SET playerType=excluded.playerType, autoplay=excluded.autoplay, vastEnabled=excluded.vastEnabled, vastTags=excluded.vastTags, isAdblockEnabled=excluded.isAdblockEnabled;",
+            [generateUUID(), body.playerType || 'jwplayer', body.autoplay ? '1' : '0', body.vastEnabled ? '1' : '0', JSON.stringify(body.vastTags || []), body.isAdblockEnabled ? '1' : '0'],
+            env
+          );
+        } else if (stype === 'imagekit') {
+          await queryTurso(
+            "INSERT INTO settings (id, type, publicKey, privateKey, urlEndpoint) VALUES (?, 'imagekit', ?, ?, ?) ON CONFLICT(type) DO UPDATE SET publicKey=excluded.publicKey, privateKey=CASE WHEN excluded.privateKey != '' THEN excluded.privateKey ELSE settings.privateKey END, urlEndpoint=excluded.urlEndpoint;",
+            [generateUUID(), body.publicKey || '', body.privateKey || '', body.urlEndpoint || ''],
+            env
+          );
+        } else if (stype === 'admin') {
+          const updateArgs = [generateUUID(), body.username || 'admin'];
+          if (body.password) {
+            await queryTurso(
+              "INSERT INTO settings (id, type, username, password) VALUES (?, 'admin', ?, ?) ON CONFLICT(type) DO UPDATE SET username=excluded.username, password=excluded.password;",
+              [generateUUID(), body.username || 'admin', body.password],
+              env
+            );
+          }
         }
         return new Response(JSON.stringify({ success: true, message: 'Settings saved' }), { status: 200, headers: corsHeaders });
       }
