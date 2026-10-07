@@ -1,0 +1,10 @@
+name = "shindora-stream-worker"
+main = "cloudflare-worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+ORIGIN_APP_URL = "https://e127797a-9d93-4499-be31-b84492eb6a96.preview.emergentagent.com"
+
+# Optional Cron Trigger for 24h background token refresh
+[triggers]
+crons = ["0 0 * * *"]

@@ -1,0 +1,7 @@
+1
+00:00:01,000 --> 00:00:04,000
+Halo, selamat datang di ShinDora Stream!
+
+2
+00:00:05,000 --> 00:00:09,000
+Streaming video cepat dan lancar tanpa buffer.
