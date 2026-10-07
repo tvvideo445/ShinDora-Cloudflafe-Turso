@@ -1,15 +1,17 @@
 # ShinDora Stream - Product Requirements Document & Architecture
 
 ## Overview
-ShinDora Stream adalah platform video streaming proxy dan CDN manager untuk video dari VK Video, OK.ru, dan Sibnet dengan JWPlayer 8, VAST/VMAP Ads Engine, 24h Background Token Sync, Subtitle Converter, serta Direct Download Proxy berkecepatan tinggi yang dapat di-deploy secara mandiri ke Cloudflare Workers.
+ShinDora Stream adalah platform video streaming proxy dan CDN manager untuk video dari VK Video, OK.ru, dan Sibnet dengan JWPlayer 8, VAST/VMAP Ads Engine, 24h Background Token Sync, Subtitle Converter, serta Direct Download Proxy berkecepatan tinggi yang dapat di-deploy secara 100% mandiri ke Cloudflare Workers dengan database Cloudflare D1 SQL.
 
 ## Core Features Implemented
-1. **Cloudflare Worker Mandiri & Deployable Artifacts**:
-   - `cloudflare-worker.js`: Streaming proxy dengan HTTP 206 Partial Content byte-range seeking, 24h cron token refresh, auto token recovery saat 401/403/404/410, subtitle proxy WebVTT.
-   - `cloudflare-worker-download.js`: Dedicated direct download worker dengan filename formatting otomatis `<Judul> (<Kualitas>).mp4`.
-   - `cloudflare-worker-all-in-one.js`: Standalone All-in-One Cloudflare Worker.
-   - `wrangler.toml`: Konfigurasi deployment Wrangler siap pakai.
-   - `CLOUDFLARE_WORKER_GUIDE.md`: Panduan deployment detail.
+1. **Cloudflare D1 SQL Standalone Worker (`cloudflare-worker-d1.js`)**:
+   - 100% Mandiri tanpa server origin terpisah.
+   - Database SQLite di Edge melalui Cloudflare D1 SQL (`env.DB`).
+   - Berkas SQL migration `schema.sql` (tabel: `links`, `settings`, `sessions`).
+   - REST API lengkap (Auth, Settings, Video Links CRUD, ImageKit Signature, VAST XML Proxy).
+   - In-Worker Video Scraper (VK Video API & Embed Scraper, OK.ru, Sibnet).
+   - Video Stream & Download Proxy dengan auto-recovery langsung menulis ke tabel D1 saat terjadi 401/403/404/410.
+   - Cloudflare Cron scheduled trigger tiap 24 jam memperbarui token di D1.
 2. **Dashboard & Video Management**:
    - Video listing dengan statistik per-host (Total, VK, OK.ru, Sibnet).
    - Sinkronisasi token 24 jam satu klik & indikator status keaktifan token.
